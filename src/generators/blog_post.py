@@ -1,6 +1,5 @@
 """ブログ記事生成エンジン。"""
 
-import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 

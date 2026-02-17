@@ -39,6 +39,17 @@ class WordPressPublishError(ContentCreatorError):
             super().__init__(message)
 
 
+class XPublishError(ContentCreatorError):
+    """X投稿エラー。"""
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        self.status_code = status_code
+        if status_code:
+            super().__init__(f"{message} (HTTP {status_code})")
+        else:
+            super().__init__(message)
+
+
 class DraftSaveError(ContentCreatorError):
     """ドラフト保存エラー。"""
 

@@ -1,6 +1,5 @@
-> **ステータス: 計画段階**
-> このドキュメントは `docs/ideas/20260213-social-content-creator.md` から生成されました。
-> 実装後は `/update-docs` で実態に同期してください。
+> **ステータス: 実装済み**
+> 最終更新: 2026-02-17
 
 # 機能設計書 (Functional Design Document)
 
@@ -15,6 +14,7 @@ graph TB
     Collector["情報収集ツール群<br/>collectors/"]
     Publisher["投稿先連携<br/>publishers/"]
     Storage["ローカル保存<br/>docs/drafts/ → docs/posts/"]
+    XSkill["X投稿スキル<br/>/publish-to-x"]
 
     WebSearch[Web検索]
     URLFetcher[URL取得・解析]
@@ -23,8 +23,10 @@ graph TB
     GitHubAPI[GitHub API]
 
     WordPress[WordPress REST API]
+    XAPI[X API v2]
 
     User --> Skill
+    User --> XSkill
     Skill --> Generator
     Generator --> Template
     Generator --> Collector
@@ -38,6 +40,8 @@ graph TB
     Collector --> GitHubAPI
 
     Publisher --> WordPress
+    XSkill --> Publisher
+    Publisher --> XAPI
 ```
 
 ## 技術スタック
@@ -57,9 +61,10 @@ graph TB
 ### エンティティ: BlogPost
 
 ```python
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
+
+from pydantic import BaseModel
 
 type ContentType = Literal[
     "weekly-ai-news",
@@ -74,67 +79,84 @@ type ContentType = Literal[
 
 type PostStatus = Literal["draft", "review", "ready", "published"]
 
-@dataclass
-class BlogPost:
+class BlogPost(BaseModel):
     """ブログ記事のデータモデル"""
     title: str                              # 記事タイトル
     content: str                            # 記事本文（Markdown）
     content_type: ContentType               # コンテンツタイプ
     status: PostStatus = "draft"            # 記事ステータス
-    topic: str | None = None                # トピック・キーワード
-    source_url: str | None = None           # 参照URL
-    source_repo: str | None = None          # 参照GitHubリポジトリ
-    categories: list[str] = field(default_factory=list)  # カテゴリ
-    tags: list[str] = field(default_factory=list)        # タグ
-    word_count: int = 0                     # 文字数
-    created_at: datetime = field(default_factory=datetime.now)  # 作成日時
-    updated_at: datetime = field(default_factory=datetime.now)  # 更新日時
-    published_url: str | None = None        # 投稿後のURL
+    slug: str                               # URLスラッグ
+    categories: list[str] = []              # カテゴリ
+    tags: list[str] = []                    # タグ
+    created_at: datetime                    # 作成日時
+    published_at: datetime | None = None    # 投稿日時
+    wordpress_id: int | None = None         # WordPress投稿ID
+    wordpress_url: str | None = None        # WordPress投稿URL
 ```
-
-**制約**:
-- `title` は空文字列不可
-- `content` は空文字列不可
-- `word_count` はcontentから自動算出
 
 ### エンティティ: ContentTemplate
 
 ```python
-@dataclass
-class ContentTemplate:
+class TemplateSection(BaseModel):
+    """テンプレートのセクション定義"""
+    title: str                              # セクションタイトル
+    description: str                        # セクション説明
+    required: bool = True                   # 必須セクションかどうか
+
+class ContentTemplate(BaseModel):
     """コンテンツタイプ別テンプレート"""
     content_type: ContentType               # コンテンツタイプ
     name: str                               # テンプレート名
     description: str                        # テンプレートの説明
     min_words: int                          # 最小文字数
     max_words: int                          # 最大文字数
-    sections: list[str]                     # セクション構成
+    sections: list[TemplateSection]         # セクション構成
     style_guide: str                        # 文体ガイド
-    template_prompt: str                    # 記事生成プロンプト
+```
+
+**テンプレートレジストリ** (`src/templates/__init__.py`):
+```python
+def get_template(content_type: ContentType) -> ContentTemplate:
+    """指定タイプのテンプレートを取得する（未登録時 TemplateNotFoundError）"""
+    ...
+
+def list_templates() -> list[ContentTemplate]:
+    """全テンプレートのリストを返す"""
+    ...
 ```
 
 ### エンティティ: CollectedData
 
 ```python
-@dataclass
-class CollectedData:
+class CollectedData(BaseModel):
     """情報収集結果"""
     source: str                             # 情報源（web_search, url, gemini, notion, github）
     title: str                              # タイトル
-    content: str                            # 内容
     url: str | None = None                  # URL
-    collected_at: datetime = field(default_factory=datetime.now)
+    content: str                            # 内容
+    collected_at: datetime                  # 収集日時
 ```
 
 ### エンティティ: PublishResult
 
 ```python
-@dataclass
-class PublishResult:
+class PublishResult(BaseModel):
     """投稿結果"""
     success: bool                           # 成功/失敗
     post_id: int | None = None              # WordPress投稿ID
     url: str | None = None                  # 投稿URL
+    error_message: str | None = None        # エラーメッセージ
+```
+
+### エンティティ: XPublishResult
+
+```python
+class XPublishResult(BaseModel):
+    """X投稿結果のデータモデル"""
+    success: bool                           # 成功/失敗
+    tweet_id: str | None = None             # ツイートID
+    tweet_url: str | None = None            # ツイートURL
+    thread_ids: list[str] = []              # スレッド投稿時の全ツイートID
     error_message: str | None = None        # エラーメッセージ
 ```
 
@@ -150,29 +172,69 @@ class PublishResult:
 
 **インターフェース**:
 ```python
-from typing import Protocol
-
-class BlogPostGeneratorProtocol(Protocol):
-    """記事生成エンジンのインターフェース"""
-
-    async def generate(
-        self,
-        content_type: ContentType,
-        topic: str | None = None,
-        source_url: str | None = None,
-        source_repo: str | None = None,
-    ) -> BlogPost:
-        """記事ドラフトを生成する"""
-        ...
+class BlogPostGenerator:
+    """ブログ記事の生成・保存・管理を行うジェネレーター"""
 
     def get_template(self, content_type: ContentType) -> ContentTemplate:
         """指定タイプのテンプレートを取得する"""
         ...
+
+    def build_prompt_context(
+        self,
+        template: ContentTemplate,
+        topic: str | None = None,
+        source_url: str | None = None,
+        collected_data: list[CollectedData] | None = None,
+    ) -> str:
+        """記事生成用のプロンプトコンテキストを構築する。
+        スキル層（Claude LLM）が記事本文を生成するための情報を整理する。"""
+        ...
+
+    async def generate(
+        self,
+        content_type: ContentType,
+        title: str,
+        content: str,
+        topic: str | None = None,
+        source_url: str | None = None,
+        collected_data: list[CollectedData] | None = None,
+    ) -> BlogPost:
+        """ブログ記事オブジェクトを生成する。
+        記事本文はスキル層（Claude LLM）が生成し、このメソッドに渡される。"""
+        ...
+
+    async def save_draft(self, post: BlogPost) -> Path:
+        """記事をドラフトとして保存する"""
+        ...
+
+    async def load_draft(self, path: Path) -> BlogPost:
+        """ドラフトファイルから記事を読み込む"""
+        ...
+
+    async def move_to_published(self, post: BlogPost, draft_path: Path) -> Path:
+        """ドラフトを投稿済みディレクトリに移動する"""
+        ...
 ```
+
+**備考**: 実際の設計では、記事本文の生成はスキル層（Claude LLM）が行い、`generate()` は構造化のみ担当する。`build_prompt_context()` でテンプレートと収集データからプロンプト情報を構築し、スキル層がそれを元に記事本文を生成する。
 
 **依存関係**:
 - ContentTemplate（テンプレート）
 - Collector群（情報収集）
+
+### PublisherProtocol（投稿共通プロトコル）
+
+**インターフェース**:
+```python
+class PublisherProtocol(Protocol):
+    """投稿先連携の共通プロトコル"""
+
+    async def publish(self, post: BlogPost, **kwargs: object) -> PublishResult:
+        """記事を投稿する"""
+        ...
+```
+
+WordPressPublisher・XPublisher はこのプロトコルを実装する。
 
 ### WordPressPublisher（WordPress投稿）
 
@@ -183,9 +245,12 @@ class BlogPostGeneratorProtocol(Protocol):
 - カテゴリ・タグの設定
 
 **インターフェース**:
+
+`PublisherProtocol`（共通プロトコル）の `publish()` を実装し、WordPress固有のメソッドを追加:
+
 ```python
-class WordPressPublisherProtocol(Protocol):
-    """WordPress投稿のインターフェース"""
+class WordPressPublisher:
+    """WordPress REST APIで記事を投稿するPublisher"""
 
     async def publish(
         self,
@@ -197,18 +262,59 @@ class WordPressPublisherProtocol(Protocol):
         """記事をWordPressに投稿する"""
         ...
 
-    async def get_categories(self) -> list[dict]:
-        """カテゴリ一覧を取得する"""
+    async def get_categories(self) -> list[dict[str, object]]:
+        """WordPress上のカテゴリ一覧を取得する"""
         ...
 
-    async def get_tags(self) -> list[dict]:
-        """タグ一覧を取得する"""
+    async def get_tags(self) -> list[dict[str, object]]:
+        """WordPress上のタグ一覧を取得する"""
         ...
 ```
 
 **依存関係**:
 - httpx（HTTP通信）
 - 環境変数（認証情報）
+
+### XPublisher（X投稿）
+
+**責務**:
+- X API v2との通信（OAuth 1.0a認証）
+- 1ツイート投稿（280文字以内）
+- スレッド投稿（複数ツイートの連鎖投稿）
+- 文字数バリデーション
+- リトライ処理（ネットワークエラー・サーバーエラー時に1回）
+
+**インターフェース**:
+```python
+class XPublisher:
+    """X API v2でツイートを投稿するPublisher"""
+
+    async def publish(
+        self,
+        post: BlogPost,
+        text: str | None = None,
+        **kwargs: object,
+    ) -> PublishResult:
+        """記事の紹介ツイートを1件投稿する"""
+        ...
+
+    async def publish_thread(
+        self,
+        post: BlogPost,
+        texts: list[str],
+    ) -> XPublishResult:
+        """スレッド形式で複数ツイートを投稿する"""
+        ...
+
+    def validate_text(self, text: str) -> None:
+        """テキストの文字数バリデーション（280文字超過時にValueError）"""
+        ...
+```
+
+**依存関係**:
+- httpx（HTTP通信）
+- authlib（OAuth 1.0a認証）
+- 環境変数（X API認証情報: `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`）
 
 ### Collector群（情報収集ツール）
 
@@ -221,7 +327,7 @@ class WordPressPublisherProtocol(Protocol):
 class CollectorProtocol(Protocol):
     """情報収集ツールの共通インターフェース"""
 
-    async def collect(self, query: str, **kwargs) -> list[CollectedData]:
+    async def collect(self, query: str, **kwargs: object) -> list[CollectedData]:
         """情報を収集する"""
         ...
 ```
@@ -254,21 +360,22 @@ sequenceDiagram
     participant Storage as ローカル保存
 
     User->>Skill: /create-blog-post --type weekly-ai-news
-    Skill->>Generator: generate(content_type, topic)
-    Generator->>Template: get_template("weekly-ai-news")
-    Template-->>Generator: ContentTemplate
-    Generator->>Collector: collect(topic)
-    Collector-->>Generator: list[CollectedData]
+    Skill->>Generator: get_template("weekly-ai-news")
+    Generator-->>Skill: ContentTemplate
+    Skill->>Generator: build_prompt_context(template, topic, collected_data)
+    Generator-->>Skill: プロンプトコンテキスト
+    Note over Skill: スキル層（Claude LLM）が記事本文を生成
+    Skill->>Generator: generate(content_type, title, content)
     Generator-->>Skill: BlogPost(draft)
+    Skill->>Generator: save_draft(post)
+    Generator-->>Skill: 保存パス
     Skill-->>User: ドラフト表示・レビュー依頼
     User->>Skill: 修正指示 or 承認
-    Skill->>Generator: 修正適用
-    Generator-->>Skill: BlogPost(revised)
     User->>Skill: 投稿指示
-    Skill->>Storage: save(post)
-    Storage-->>Skill: 保存完了
     Skill->>Publisher: publish(post, status="draft")
     Publisher-->>Skill: PublishResult
+    Skill->>Generator: move_to_published(post, draft_path)
+    Generator-->>Skill: 投稿済みパス
     Skill-->>User: 投稿結果（URL等）
 ```
 
@@ -338,11 +445,12 @@ docs/posts/
 ```markdown
 ---
 title: "2026年2月第2週 AIニュースハイライト"
-content_type: weekly-ai-news
+type: weekly-ai-news
 status: draft
+slug: weekly-ai-news-feb-w2
 categories: [AI, ニュース]
 tags: [AI, 週刊まとめ, 2026年2月]
-created_at: 2026-02-13T18:00:00
+date: 2026-02-13T18:00:00+00:00
 ---
 
 # 2026年2月第2週 AIニュースハイライト
@@ -355,13 +463,13 @@ created_at: 2026-02-13T18:00:00
 ```markdown
 ---
 title: "2026年2月第2週 AIニュースハイライト"
-content_type: weekly-ai-news
+type: weekly-ai-news
 status: published
-published_url: https://example.com/blog/2026/02/weekly-ai-news
+slug: weekly-ai-news-feb-w2
 categories: [AI, ニュース]
 tags: [AI, 週刊まとめ, 2026年2月]
-created_at: 2026-02-13T18:00:00
-published_at: 2026-02-15T19:00:00
+date: 2026-02-13T18:00:00+00:00
+published_at: 2026-02-15T19:00:00+00:00
 ---
 
 # 2026年2月第2週 AIニュースハイライト
@@ -383,6 +491,16 @@ src/templates/
 └── feature.py
 ```
 
+## ユーティリティ関数（src/utils/markdown.py）
+
+| 関数 | 説明 |
+|------|------|
+| `write_frontmatter_markdown(path, metadata, content)` | front matter付きMarkdownファイルを書き出す |
+| `read_frontmatter_markdown(path)` | front matter付きMarkdownファイルを読み込み `(metadata, content)` を返す |
+| `generate_slug(title)` | タイトルからURLスラッグを生成する（日本語除去、英数字+ハイフンのみ） |
+| `markdown_to_html(text)` | MarkdownテキストをHTMLに変換する（`markdown` ライブラリ使用） |
+| `count_characters(text)` | Markdown記法を除去して文字数をカウントする |
+
 ## パフォーマンス最適化
 
 - **非同期処理**: 情報収集ツールはasyncで並行実行し、記事生成の待ち時間を短縮
@@ -403,17 +521,21 @@ src/templates/
 | エラー種別 | 処理 | ユーザーへの表示 |
 |-----------|------|-----------------|
 | WordPress API認証エラー | リトライ不可、設定確認を案内 | 「WordPress認証に失敗しました。.envの設定を確認してください」 |
-| WordPress API通信エラー | 3回リトライ後に失敗 | 「WordPress接続に失敗しました。ローカルにドラフトを保存しました」 |
+| WordPress API通信エラー | リトライなし、即時エラー | 「WordPress接続に失敗しました。ローカルにドラフトを保存しました」 |
 | 情報収集タイムアウト | スキップして利用可能なデータで生成 | 「一部の情報収集がタイムアウトしました。取得済みデータで記事を生成します」 |
 | URL取得エラー | スキップ | 「指定URLの取得に失敗しました: {url}」 |
-| テンプレート不存在 | デフォルトテンプレートを使用 | 「指定タイプのテンプレートが見つかりません。汎用テンプレートを使用します」 |
+| テンプレート不存在 | TemplateNotFoundError を送出 | 「テンプレート '{content_type}' が見つかりません」 |
 | 入力バリデーションエラー | 即時エラー | 「{field}が不正です: {reason}」 |
+| X API認証エラー | リトライ不可、設定確認を案内 | 「認証に失敗しました。.envのX_API_KEY等を確認してください」 |
+| X API通信エラー | 1回リトライ後に失敗 | 「通信エラー: {error}」 |
+| X投稿文字数超過 | 投稿前にバリデーション | 「投稿テキストが280文字を超えています（{N}文字超過）」 |
 
 ## テスト戦略
 
 ### ユニットテスト
 - BlogPostGenerator: テンプレート適用、ドラフト生成ロジック
 - WordPressPublisher: API呼び出し（モック）、レスポンスパース
+- XPublisher: ツイート投稿（モック）、スレッド投稿、文字数バリデーション、エラーハンドリング
 - Collector群: 各情報源からのデータ取得（モック）
   - NotionNewsCollector: Google Alertニュース取得（過去1週間フィルタ）
   - NotionPaperCollector: Arxiv論文取得（テーマ指定/期間指定）

@@ -35,6 +35,16 @@ class BlogPost(BaseModel):
     wordpress_url: str | None = None
 
 
+class XPublishResult(BaseModel):
+    """X投稿結果のデータモデル。"""
+
+    success: bool
+    tweet_id: str | None = None
+    tweet_url: str | None = None
+    thread_ids: list[str] = []
+    error_message: str | None = None
+
+
 class CollectedData(BaseModel):
     """情報収集結果のデータモデル。"""
 

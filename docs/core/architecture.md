@@ -20,6 +20,10 @@
 | pydantic | 2.0+ | データバリデーション | 型安全なデータモデル定義 |
 | python-frontmatter | 1.1+ | Markdownメタデータ | 記事ファイルのfront matter解析 |
 | jinja2 | 3.1+ | テンプレートエンジン | 記事テンプレートのレンダリング |
+| authlib | 1.3+ | OAuth認証 | X API OAuth 1.0a認証 |
+| markdown | 3.10+ | Markdown→HTML変換 | 記事本文のHTML変換に使用 |
+| python-dotenv | 1.0+ | 環境変数読み込み | .envファイルの読み込み |
+| google-genai | 1.63+ | Gemini API | GeminiCollector用 |
 
 ### 開発ツール
 
@@ -27,10 +31,12 @@
 |------|-----------|------|----------|
 | pytest | 8.0+ | テスト | Python標準テストフレームワーク |
 | pytest-asyncio | 0.24+ | 非同期テスト | async関数のテストサポート |
+| pytest-cov | 7.0+ | カバレッジ計測 | テストカバレッジの可視化 |
 | ruff | 0.8+ | Lint・フォーマット | 高速、包括的なルールセット |
 | black | 24.0+ | コードフォーマット | 一貫したコードスタイル |
 | mypy | 1.14+ | 型チェック | 静的型安全性の確保 |
 | pytest-mock | 3.14+ | モック | テスト用モック機能 |
+| respx | 0.22+ | HTTPモック | httpxリクエストのモック |
 
 ## アーキテクチャパターン
 
@@ -51,8 +57,8 @@
 │   │ templates  │ models (データモデル) │  │
 │   └────────────┴──────────────────────┘  │
 └──────────────────────────────────────────┘
-         ↕              ↕            ↕
-    ローカルFS     外部API群    WordPress
+         ↕              ↕            ↕          ↕
+    ローカルFS     外部API群    WordPress    X API v2
 ```
 
 #### スキル層（Claude Code Skills）
@@ -83,7 +89,7 @@
 | データ種別 | ストレージ | フォーマット | 理由 |
 |-----------|----------|-------------|------|
 | 生成記事 | ローカルファイル | Markdown + front matter | 人間が読みやすい、Git管理可能 |
-| テンプレート | Pythonモジュール | Python dataclass | 型安全、IDEサポート |
+| テンプレート | Pythonモジュール | Pydantic BaseModel | 型安全、IDEサポート |
 | 設定情報 | 環境変数 | .env | セキュリティ、デプロイ容易性 |
 
 ### 記事保存ディレクトリ構造
@@ -148,6 +154,7 @@ docs/posts/
 | Web検索結果取得 | 30秒以内 | インターネット接続環境 |
 | URL内容取得・要約 | 30秒以内 | インターネット接続環境 |
 | WordPress投稿 | 10秒以内 | インターネット接続環境 |
+| X投稿（1ツイート） | 10秒以内 | インターネット接続環境 |
 | 記事ローカル保存 | 500ms以内 | ローカル |
 
 ### リソース使用量
@@ -167,6 +174,10 @@ docs/posts/
   - `WORDPRESS_URL`: WordPressサイトURL
   - `WORDPRESS_USER`: WordPressユーザー名
   - `WORDPRESS_APP_PASSWORD`: Application Passwords トークン
+  - `X_API_KEY`: X API Key（OAuth 1.0a）
+  - `X_API_SECRET`: X API Secret（OAuth 1.0a）
+  - `X_ACCESS_TOKEN`: X Access Token（OAuth 1.0a）
+  - `X_ACCESS_TOKEN_SECRET`: X Access Token Secret（OAuth 1.0a）
 
 ### 入力検証
 
@@ -185,7 +196,7 @@ docs/posts/
 ### 機能拡張性
 
 - **Collector拡張**: `CollectorProtocol` を実装した新クラスを追加するだけで情報源を拡張
-- **Publisher拡張**: `PublisherProtocol` を実装した新クラスを追加するだけで投稿先を拡張（X投稿等）
+- **Publisher拡張**: `PublisherProtocol` を実装した新クラスを追加するだけで投稿先を拡張（WordPress、X投稿を実装済み）
 - **テンプレート拡張**: `src/templates/` に新ファイルを追加するだけで新コンテンツタイプに対応
 - **設定のカスタマイズ**: テンプレートの文字数目安、セクション構成を設定可能
 
@@ -228,6 +239,7 @@ docs/posts/
 | ライブラリ | 用途 | バージョン管理方針 |
 |-----------|------|-------------------|
 | httpx | HTTP通信 | マイナーバージョン範囲指定 |
+| authlib | OAuth認証 | メジャーバージョン固定（1.x） |
 | pydantic | データモデル | メジャーバージョン固定（2.x） |
 | python-frontmatter | Markdownメタデータ | 最新 |
 | jinja2 | テンプレートエンジン | メジャーバージョン固定（3.x） |

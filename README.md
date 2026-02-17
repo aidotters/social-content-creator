@@ -44,6 +44,23 @@ cp .env.example .env
 | `cv` | 画像認識・コンピュータビジョン | 3,000〜8,000字 |
 | `feature` | 特集記事 | 15,000〜20,000字 |
 
+### WordPressに投稿
+
+```bash
+# ドラフト記事をWordPressに下書き投稿
+/publish-to-wordpress docs/drafts/2026-02-17-example.md
+
+# 公開投稿
+/publish-to-wordpress docs/drafts/2026-02-17-example.md --status publish
+```
+
+### X（Twitter）に投稿
+
+```bash
+# 記事の紹介をXに投稿
+/publish-to-x docs/posts/2026-02-17-example.md
+```
+
 ## 開発
 
 ```bash
@@ -80,4 +97,9 @@ uv run black .
 | `WORDPRESS_URL` | WordPressサイトURL |
 | `WORDPRESS_USER` | WordPressユーザー名 |
 | `WORDPRESS_APP_PASSWORD` | WordPress Application Password |
+| `GEMINI_API_KEY` | Gemini APIキー（オプション） |
 | `GITHUB_TOKEN` | GitHub APIトークン（オプション） |
+| `X_API_KEY` | X API Key（オプション） |
+| `X_API_SECRET` | X API Secret（オプション） |
+| `X_ACCESS_TOKEN` | X Access Token（オプション） |
+| `X_ACCESS_TOKEN_SECRET` | X Access Token Secret（オプション） |

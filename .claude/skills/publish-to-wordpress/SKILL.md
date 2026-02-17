@@ -77,7 +77,12 @@ else:
 
 投稿成功時:
 
-1. ドラフトを投稿済みディレクトリに移動する
+1. ドラフトファイルのfront matterに `wordpress_url` を追記する（投稿結果の `result.url` を使用）
+   - front matterの `---` ブロック内に `wordpress_url: ${RESULT_URL}` を追加
+   - `status: published` に更新
+   - `published_at:` に現在日時を記録
+
+2. ドラフトを投稿済みディレクトリに移動する
    ```bash
    uv run python -c "
    import asyncio
@@ -89,7 +94,11 @@ else:
    print(f'移動先: {dest}')
    "
    ```
-2. 投稿URLをユーザーに表示する
+3. 投稿URLをユーザーに表示する
+
+4. **X投稿の確認**: ユーザーに「Xにも投稿しますか？」と確認する
+   - 「はい」の場合: `/publish-to-x` スキルのフローを実行する。投稿済み記事のパス（`docs/posts/` に移動後のパス）を使用し、front matterの `wordpress_url` が紹介文に含まれる
+   - 「いいえ」の場合: 処理を終了する
 
 投稿失敗時:
 - エラー内容を表示し、`.env` の `WORDPRESS_URL`, `WORDPRESS_USER`, `WORDPRESS_APP_PASSWORD` の設定を確認するよう案内する

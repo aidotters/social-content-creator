@@ -1,6 +1,5 @@
-> **ステータス: 計画段階**
-> このドキュメントは `docs/ideas/20260213-social-content-creator.md` から生成されました。
-> 実装後は `/update-docs` で実態に同期してください。
+> **ステータス: 実装済み**
+> 最終更新: 2026-02-17
 
 # プロジェクト用語集 (Glossary)
 
@@ -8,7 +7,7 @@
 
 このドキュメントは、Social Content Creator プロジェクト内で使用される用語の定義を管理します。
 
-**更新日**: 2026-02-13
+**更新日**: 2026-02-17
 
 ## ドメイン用語
 
@@ -52,7 +51,7 @@
 
 **定義**: 記事生成エンジンが出力した、レビュー・編集前の記事
 
-**説明**: ユーザーが対話的にレビュー・修正を行い、承認後にWordPressに投稿される。ローカルファイルとして `docs/posts/` に保存される。
+**説明**: ユーザーが対話的にレビュー・修正を行い、承認後にWordPressに投稿される。ローカルファイルとして `docs/drafts/` に保存される。
 
 **関連用語**: BlogPost、投稿ステータス
 
@@ -143,6 +142,26 @@
 **本プロジェクトでの用途**: WordPress REST APIの認証に使用。環境変数 `WORDPRESS_APP_PASSWORD` で管理。
 
 **関連ドキュメント**: `architecture.md` - セキュリティアーキテクチャ
+
+### X API v2
+
+**定義**: X（旧Twitter）のHTTPベースのREST API（バージョン2）
+
+**公式サイト**: https://developer.x.com/
+
+**本プロジェクトでの用途**: ツイート投稿（1ツイート / スレッド）に使用。`src/publishers/x.py` で実装。OAuth 1.0a User Contextで認証。
+
+**関連ドキュメント**: `functional-design.md` - XPublisherコンポーネント
+
+### authlib
+
+**定義**: Python用のOAuth認証ライブラリ
+
+**公式サイト**: https://authlib.org/
+
+**本プロジェクトでの用途**: X API v2のOAuth 1.0a認証に使用。`src/publishers/x.py` で利用。
+
+**バージョン**: 1.3+
 
 ### httpx
 
@@ -236,9 +255,9 @@
 
 **定義**: Claude Code Skills で実装されるユーザーインターフェース層
 
-**本プロジェクトでの適用**: `/create-blog-post` コマンドの処理、対話的な記事レビュー・修正のフロー制御を担当
+**本プロジェクトでの適用**: `/create-blog-post` コマンドの処理、対話的な記事レビュー・修正のフロー制御、`/publish-to-x` コマンドのX投稿フロー制御を担当
 
-**関連コンポーネント**: `.claude/skills/create-blog-post/`
+**関連コンポーネント**: `.claude/skills/create-blog-post/`, `.claude/skills/publish-to-x/`
 
 **図解**:
 ```
@@ -265,7 +284,7 @@
 
 **定義**: 複数の投稿先プラットフォームに対して共通インターフェースで投稿するパターン
 
-**本プロジェクトでの適用**: `PublisherProtocol` を定義し、WordPress（Phase 1）、X/Twitter（Phase 2）等の各Publisherが同一インターフェースで投稿する。
+**本プロジェクトでの適用**: `PublisherProtocol` を定義し、WordPressPublisher（WordPress投稿）、XPublisher（X投稿）の各Publisherが同一インターフェースで投稿する。
 
 **関連コンポーネント**: `src/publishers/base.py`
 
@@ -302,8 +321,11 @@ stateDiagram-v2
 - `content`: 記事本文（Markdown）
 - `content_type`: コンテンツタイプ
 - `status`: 記事ステータス
+- `slug`: URLスラッグ
 - `categories`: カテゴリ一覧
 - `tags`: タグ一覧
+- `wordpress_id`: WordPress投稿ID
+- `wordpress_url`: WordPress投稿URL
 
 **関連エンティティ**: ContentTemplate, PublishResult
 
@@ -314,8 +336,8 @@ stateDiagram-v2
 **主要フィールド**:
 - `content_type`: コンテンツタイプ
 - `min_words` / `max_words`: 文字数目安
-- `sections`: セクション構成
-- `template_prompt`: 記事生成プロンプト
+- `sections`: セクション構成（`list[TemplateSection]`）
+- `style_guide`: 文体ガイド
 
 **関連エンティティ**: BlogPost
 
@@ -324,7 +346,7 @@ stateDiagram-v2
 **定義**: 情報収集結果を表すデータモデル
 
 **主要フィールド**:
-- `source`: 情報源（web_search, url, gemini, github）
+- `source`: 情報源（web_search, url, gemini, github, notion_news, notion_paper）
 - `title`: タイトル
 - `content`: 内容
 - `url`: URL
@@ -343,7 +365,36 @@ stateDiagram-v2
 
 **関連エンティティ**: BlogPost
 
+### XPublishResult
+
+**定義**: X投稿結果を表すデータモデル
+
+**主要フィールド**:
+- `success`: 成功/失敗
+- `tweet_id`: ツイートID
+- `tweet_url`: ツイートURL
+- `thread_ids`: スレッド投稿時の全ツイートIDリスト
+- `error_message`: エラーメッセージ
+
+**関連エンティティ**: BlogPost
+
 ## エラー・例外
+
+### ContentCreatorError
+
+**クラス名**: `ContentCreatorError`
+
+**発生条件**: プロジェクト内の全カスタムエラーの基底クラス。直接発生させるケースは少なく、サブクラス（`WordPressPublishError`, `CollectionError`, `XPublishError`, `TemplateNotFoundError`, `DraftSaveError`）を通じて使用される。
+
+**対処方法**: サブクラスごとの対処方法を参照。
+
+### DraftSaveError
+
+**クラス名**: `DraftSaveError`
+
+**発生条件**: ドラフト記事のファイル保存に失敗した場合（ディスク容量不足、パーミッションエラー、移動先ファイルの重複等）
+
+**対処方法**: 保存先パスの権限・空き容量を確認。移動先重複の場合はファイル名を変更。
 
 ### WordPressPublishError
 
@@ -360,6 +411,14 @@ stateDiagram-v2
 **発生条件**: 情報収集ツールがデータ取得に失敗した場合（タイムアウト、API制限等）
 
 **対処方法**: 該当の情報源をスキップし、取得済みデータで記事を生成。
+
+### XPublishError
+
+**クラス名**: `XPublishError`
+
+**発生条件**: X API v2 への投稿が失敗した場合（認証エラー、レート制限、通信エラー等）
+
+**対処方法**: `.env` の `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` を確認。ネットワークエラーの場合は自動で1回リトライされる。
 
 ### TemplateNotFoundError
 

@@ -1,6 +1,5 @@
-> **ステータス: 計画段階**
-> このドキュメントは `docs/ideas/20260213-social-content-creator.md` から生成されました。
-> 実装後は `/update-docs` で実態に同期してください。
+> **ステータス: 実装済み**
+> 最終更新: 2026-02-17
 
 # 開発ガイドライン (Development Guidelines)
 
@@ -43,10 +42,10 @@ class WebSearchCollector: ...
 
 # Protocol: PascalCase
 class CollectorProtocol(Protocol):
-    async def collect(self, query: str, **kwargs) -> list[CollectedData]: ...
+    async def collect(self, query: str, **kwargs: object) -> list[CollectedData]: ...
 
 class PublisherProtocol(Protocol):
-    async def publish(self, post: BlogPost, **kwargs) -> PublishResult: ...
+    async def publish(self, post: BlogPost, **kwargs: object) -> PublishResult: ...
 
 # 型エイリアス: PascalCase (Python 3.12+)
 type ContentType = Literal[
@@ -129,28 +128,28 @@ post_url = f"{base_url}/?p={post_id}"
 
 **例**:
 ```python
-from dataclasses import dataclass
+# 基底エラークラス
+class ContentCreatorError(Exception):
+    """基底エラークラス"""
+    def __init__(self, message: str) -> None:
+        self.message = message
+        super().__init__(message)
 
-# 例外クラス定義
-@dataclass
-class WordPressPublishError(Exception):
+# 例外クラス定義（ContentCreatorErrorを継承）
+class WordPressPublishError(ContentCreatorError):
     """WordPress投稿エラー"""
-    message: str
-    status_code: int | None = None
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        self.status_code = status_code
+        if status_code:
+            super().__init__(f"{message} (HTTP {status_code})")
+        else:
+            super().__init__(message)
 
-    def __str__(self) -> str:
-        if self.status_code:
-            return f"{self.message} (HTTP {self.status_code})"
-        return self.message
-
-@dataclass
-class CollectionError(Exception):
+class CollectionError(ContentCreatorError):
     """情報収集エラー"""
-    source: str
-    message: str
-
-    def __str__(self) -> str:
-        return f"[{self.source}] {self.message}"
+    def __init__(self, source: str, message: str) -> None:
+        self.source = source
+        super().__init__(f"[{source}] {message}")
 
 # エラーハンドリング
 try:
@@ -171,19 +170,17 @@ except Exception as e:
 
 **ブランチ種別**:
 - `main`: 安定版（リリース可能な状態）
-- `develop`: 開発の最新状態
-- `feature/[機能名]`: 新機能開発
-- `fix/[修正内容]`: バグ修正
-- `refactor/[対象]`: リファクタリング
+- `feature/[機能名]`: 新機能開発（`main` から分岐）
+- `fix/[修正内容]`: バグ修正（`main` から分岐）
+- `refactor/[対象]`: リファクタリング（`main` から分岐）
 
 **フロー**:
 ```
 main
-  └─ develop
-      ├─ feature/blog-post-generator
-      ├─ feature/wordpress-publisher
-      ├─ feature/web-search-collector
-      └─ fix/template-loading
+  ├─ feature/blog-post-generator
+  ├─ feature/wordpress-publisher
+  ├─ feature/web-search-collector
+  └─ fix/template-loading
 ```
 
 ### コミットメッセージ規約
@@ -263,12 +260,13 @@ class TestBlogPostGenerator:
             """有効なコンテンツタイプで記事を生成できる"""
             post = await generator.generate(
                 content_type="weekly-ai-news",
+                title="AIニュースまとめ",
+                content="記事本文...",
                 topic="AI最新ニュース",
             )
 
             assert post.title is not None
             assert post.content_type == "weekly-ai-news"
-            assert post.word_count > 0
 
         async def test_with_invalid_type_raises_error(
             self,
@@ -276,7 +274,11 @@ class TestBlogPostGenerator:
         ) -> None:
             """無効なコンテンツタイプでエラーをスローする"""
             with pytest.raises(TemplateNotFoundError):
-                await generator.generate(content_type="invalid-type")
+                await generator.generate(
+                    content_type="invalid-type",
+                    title="test",
+                    content="test",
+                )
 ```
 
 #### 統合テスト
@@ -408,12 +410,12 @@ cp .env.example .env
 # .env ファイルを編集（WordPress認証情報等）
 
 # 5. テストの実行
-pytest
+uv run pytest
 
 # 6. Lint・フォーマットの確認
-ruff check .
-black --check .
-mypy .
+uv run ruff check .
+uv run black --check .
+uv run mypy src/
 ```
 
 ### 環境変数（.env）
@@ -429,4 +431,10 @@ WORDPRESS_APP_PASSWORD=your-app-password
 
 # GitHub（オプション）
 GITHUB_TOKEN=your-github-token
+
+# X（Twitter）API — OAuth 1.0a（オプション）
+X_API_KEY=your-x-api-key
+X_API_SECRET=your-x-api-secret
+X_ACCESS_TOKEN=your-x-access-token
+X_ACCESS_TOKEN_SECRET=your-x-access-token-secret
 ```

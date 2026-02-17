@@ -5,7 +5,7 @@ import unicodedata
 from pathlib import Path
 
 import frontmatter
-import markdown as md
+import markdown as md  # type: ignore[import-untyped]
 
 
 def write_frontmatter_markdown(path: Path, metadata: dict[str, object], content: str) -> None:
@@ -69,7 +69,7 @@ def markdown_to_html(text: str) -> str:
     Returns:
         HTML文字列
     """
-    return md.markdown(text, extensions=["extra", "nl2br", "sane_lists"])
+    return md.markdown(text, extensions=["extra", "nl2br", "sane_lists"])  # type: ignore[no-any-return]
 
 
 def count_characters(text: str) -> int:

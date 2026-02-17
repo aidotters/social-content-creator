@@ -10,8 +10,12 @@ social-content-creator/
 ├── .claude/
 │   ├── commands/               # スラッシュコマンド
 │   ├── skills/                 # タスクモード別スキル
-│   │   └── create-blog-post/   # ブログ記事生成スキル
-│   └── agents/                 # サブエージェント定義
+│   │   ├── create-blog-post/   # ブログ記事生成スキル
+│   │   ├── publish-to-x/       # X（Twitter）投稿スキル
+│   │   ├── publish-to-wordpress/ # WordPress投稿スキル
+│   │   ├── wordpress-setup/    # WordPressセットアップスキル（Playwright MCP使用）
+│   │   └── ...                 # 汎用スキル（steering, validation, prd-writing等）
+│   └── settings.json           # Claude Code設定
 ├── src/
 │   ├── generators/             # 記事生成ロジック
 │   │   ├── __init__.py
@@ -28,7 +32,8 @@ social-content-creator/
 │   ├── publishers/             # 投稿先プラットフォーム連携
 │   │   ├── __init__.py
 │   │   ├── base.py             # PublisherProtocol定義
-│   │   └── wordpress.py
+│   │   ├── wordpress.py
+│   │   └── x.py                # XPublisher（X API v2投稿）
 │   ├── templates/              # コンテンツタイプ別テンプレート
 │   │   ├── __init__.py
 │   │   ├── weekly_ai_news.py
@@ -43,22 +48,30 @@ social-content-creator/
 │   │   ├── __init__.py
 │   │   ├── blog_post.py
 │   │   └── template.py
-│   └── utils/                  # 共通ユーティリティ
-│       ├── __init__.py
-│       └── markdown.py
+│   ├── utils/                  # 共通ユーティリティ
+│   │   ├── __init__.py
+│   │   └── markdown.py
+│   └── errors.py               # カスタムエラークラス
 ├── tests/
 │   ├── conftest.py             # テストフィクスチャ
 │   ├── unit/
 │   │   ├── generators/
 │   │   │   └── test_blog_post.py
+│   │   ├── models/
+│   │   │   ├── test_blog_post.py
+│   │   │   └── test_template.py
 │   │   ├── collectors/
 │   │   │   ├── test_web_search.py
 │   │   │   ├── test_url_fetcher.py
+│   │   │   ├── test_gemini.py
 │   │   │   ├── test_notion_news.py
 │   │   │   ├── test_notion_paper.py
 │   │   │   └── test_github.py
 │   │   ├── publishers/
-│   │   │   └── test_wordpress.py
+│   │   │   ├── test_wordpress.py
+│   │   │   └── test_x.py
+│   │   ├── utils/
+│   │   │   └── test_markdown.py
 │   │   └── templates/
 │   │       └── test_templates.py
 │   └── integration/
@@ -70,10 +83,12 @@ social-content-creator/
 │   │   ├── architecture.md
 │   │   ├── repository-structure.md
 │   │   ├── development-guidelines.md
-│   │   └── glossary.md
+│   │   ├── glossary.md
+│   ├── refs/                   # 調査レポート・参考資料
+│   │   └── wordpress-theme-research-2026.md  # WordPress テーマ調査レポート
 │   ├── ideas/                  # アイデア・ブレインストーミング
 │   │   └── 20260213-social-content-creator.md
-│   ├── plan/                   # 計画ドキュメント
+│   ├── briefs/                 # ブレスト結果の方針メモ（記事生成前のブリーフ）
 │   ├── drafts/                 # 下書き記事（作成日ベース）
 │   │   ├── weekly-ai-news/
 │   │   ├── paper-review/
@@ -87,8 +102,6 @@ social-content-creator/
 │       └── YYYY/
 │           └── MM/
 │               └── YYYYMMDD-{type}-{slug}.md
-├── scripts/                    # ユーティリティスクリプト
-├── logs/                       # ログファイル
 ├── .steering/                  # 作業計画・タスク管理
 ├── .env.example                # 環境変数テンプレート
 ├── .env                        # 環境変数（.gitignore対象）
@@ -165,10 +178,11 @@ collectors/
 **配置ファイル**:
 - `base.py`: `PublisherProtocol` インターフェース定義
 - `wordpress.py`: WordPress REST API連携
+- `x.py`: X API v2連携（OAuth 1.0a認証）
 
 **命名規則**:
 - ファイル名: snake_case、プラットフォーム名
-- クラス名: PascalCase + Publisher（例: `WordPressPublisher`）
+- クラス名: PascalCase + Publisher（例: `WordPressPublisher`, `XPublisher`）
 
 **依存関係**:
 - 依存可能: `models/`, `utils/`
@@ -179,7 +193,8 @@ collectors/
 publishers/
 ├── __init__.py
 ├── base.py             # PublisherProtocol
-└── wordpress.py        # WordPressPublisher
+├── wordpress.py        # WordPressPublisher
+└── x.py                # XPublisher
 ```
 
 #### templates/
@@ -201,7 +216,7 @@ publishers/
 **役割**: データモデル（dataclass / Pydantic model）の定義
 
 **配置ファイル**:
-- `blog_post.py`: `BlogPost`, `PostStatus`, `ContentType` 等
+- `blog_post.py`: `BlogPost`, `PostStatus`, `ContentType`, `PublishResult`, `XPublishResult` 等
 - `template.py`: `ContentTemplate` 等
 
 **命名規則**:
@@ -237,12 +252,21 @@ publishers/
 tests/unit/
 ├── generators/
 │   └── test_blog_post.py
+├── models/
+│   ├── test_blog_post.py
+│   └── test_template.py
 ├── collectors/
 │   ├── test_web_search.py
 │   ├── test_url_fetcher.py
+│   ├── test_gemini.py
+│   ├── test_notion_news.py
+│   ├── test_notion_paper.py
 │   └── test_github.py
 ├── publishers/
-│   └── test_wordpress.py
+│   ├── test_wordpress.py
+│   └── test_x.py
+├── utils/
+│   └── test_markdown.py
 └── templates/
     └── test_templates.py
 ```
@@ -266,7 +290,7 @@ tests/integration/
 **配置ドキュメント**:
 - `docs/core/`: 中核ドキュメント（PRD、設計書、ガイドライン等）
 - `docs/ideas/`: アイデア・ブレインストーミング
-- `docs/plan/`: 計画ドキュメント
+- `docs/briefs/`: ブレスト結果の方針メモ（記事生成前のブリーフ）
 - `docs/drafts/`: 下書き記事の保管（コンテンツタイプ別、ファイル名の `YYYYMMDD` は**作成日**）
 - `docs/posts/`: 投稿済み記事の保管（年/月でサブディレクトリ分割、ファイル名の `YYYYMMDD` は**投稿日**）
 
@@ -387,8 +411,12 @@ generators/      ← templates, collectors, models
 .claude/
 ├── commands/                # スラッシュコマンド
 ├── skills/                  # タスクモード別スキル
-│   └── create-blog-post/    # ブログ記事生成スキル
-└── agents/                  # サブエージェント定義
+│   ├── create-blog-post/    # ブログ記事生成スキル
+│   ├── publish-to-x/        # X（Twitter）投稿スキル
+│   ├── publish-to-wordpress/ # WordPress投稿スキル
+│   ├── wordpress-setup/     # WordPressセットアップスキル（Playwright MCP使用）
+│   └── ...                  # 汎用スキル（steering, validation, prd-writing, glossary-creation等）
+└── settings.json            # Claude Code設定
 ```
 
 ## 除外設定

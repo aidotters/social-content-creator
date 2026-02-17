@@ -1,6 +1,6 @@
 ---
 name: create-blog-post
-description: ブログ記事の生成・レビュー・投稿を一括で行うスキル。コンテンツタイプ（weekly-ai-news, paper-review, project-intro等）を指定して記事を作成し、WordPress投稿まで対応。
+description: ブログ記事の生成・レビュー・投稿を一括で行うスキル。コンテンツタイプ（weekly-ai-news, paper-review, project-intro等）を指定して記事を作成し、WordPress投稿まで対応。引数なしで起動するとブレストフェーズから開始。
 ---
 
 # create-blog-post スキル
@@ -10,17 +10,30 @@ description: ブログ記事の生成・レビュー・投稿を一括で行う�
 ## コマンド形式
 
 ```
-/create-blog-post --type <content_type> [--topic <topic>] [--url <url>] [--repo <owner/repo>]
+/create-blog-post [--type <content_type>] [--topic <topic>] [--url <url>] [--repo <owner/repo>] [--brief <path>]
 ```
 
 ## 引数
 
 | 引数 | 必須 | 説明 |
 |------|------|------|
-| `--type` | Yes | コンテンツタイプ（下記参照） |
+| `--type` | No | コンテンツタイプ（下記参照）。未指定時はブレストフェーズから開始 |
 | `--topic` | No | キーワード・トピック |
 | `--url` | No | 参照URL |
 | `--repo` | No | GitHubリポジトリ（owner/repo形式） |
+| `--brief` | No | ブリーフファイルのパス（`docs/briefs/` 配下） |
+
+## フロー分岐
+
+```
+--type 指定あり       → 従来フロー（ステップ1〜4）
+--brief 指定あり      → ブリーフ読み込み → ステップ1〜4（type/topic等をブリーフから取得）
+--type も --brief もなし → ステップ0: ブレスト → 方針確定 → ステップ1〜4
+```
+
+- `--type` が指定されていれば、従来通りステップ1（情報収集）から開始する
+- `--brief` が指定されていれば、ブリーフファイルを読み込み、記載された `type`・方針・情報ソースを元にステップ1から開始する
+- どちらも未指定の場合、ステップ0（ブレスト）から開始し、方針が固まったらステップ1に進む
 
 ## コンテンツタイプ
 
@@ -37,13 +50,79 @@ description: ブログ記事の生成・レビュー・投稿を一括で行う�
 
 ## 実行フロー
 
+### ステップ0: ブレスト（--type 未指定時のみ）
+
+`--type` が指定されていない場合、記事の方向性を決めるブレストフェーズを実行する。
+
+#### 0-1. ネタ出し
+
+トピックが指定されていればそこを起点に、なければ以下をソースにしてネタを広げる。
+
+- **Notion MCP** でストックしたニュース・論文・記事を検索
+  ```
+  mcp__claude_ai_Notion__search で関連データベースを検索
+  ```
+- **WebSearch** で最新トレンドを調査
+- **ユーザーとの対話** で関心領域を掘り下げる
+
+#### 0-2. 切り口の提案
+
+3〜5つの切り口を提案し、ユーザーと壁打ちする。各切り口について以下を提示する:
+
+- **タイトル案**
+- **想定読者**
+- **記事タイプ**（content_type）
+- **概要**（2〜3文）
+
+ユーザーのフィードバックを受けて絞り込む。必要に応じて提案を修正・追加する。
+
+#### 0-3. 方針の確定
+
+ユーザーが1つを選択、またはカスタマイズしたら、以下を確定する:
+
+- 記事タイプ（content_type）
+- タイトル（仮）
+- ターゲット読者
+- 記事の切り口・主張
+- 必要な情報ソース
+
+#### 0-4. ブリーフ保存
+
+確定した方針を `docs/briefs/YYYYMMDD-slug.md` に保存する。
+
+```markdown
+---
+date: YYYY-MM-DD
+type: <content_type>
+status: confirmed
+---
+
+# ブリーフ: {仮タイトル}
+
+## 方針
+- **切り口**: ...
+- **ターゲット読者**: ...
+- **主張/メッセージ**: ...
+
+## 情報ソース
+- ...
+
+## メモ
+- ブレスト時の議論ポイント
+```
+
+#### 0-5. 記事生成へ
+
+確定した方針でステップ1（情報収集）に進む。ブレストで決まった `--type`, `--topic` 等の情報を引き継ぐ。ブリーフファイルも情報収集時の参照資料として活用する。
+
 ### ステップ1: 引数の解析と情報収集
 
 1. **コマンド引数を解析**する
-   - `--type`: 必須。テンプレート取得に使用
+   - `--type`: テンプレート取得に使用（ブレスト経由の場合は確定済み）
    - `--topic`: 記事のテーマとして使用
    - `--url`: URLFetcherCollectorで内容を取得
    - `--repo`: GitHubCollectorでリポジトリ情報を取得
+   - `--brief`: ブリーフファイルを読み込み、frontmatterの `type` と本文の方針情報を取得。`--type` や `--topic` が未指定の場合はブリーフの値を使用する
 
 2. **テンプレートを取得**する
    ```bash
@@ -140,17 +219,26 @@ description: ブログ記事の生成・レビュー・投稿を一括で行う�
 ## 使用例
 
 ```
-# 週刊AIニュースハイライト
+# ブレストから始める（--type なし）
+/create-blog-post
+
+# トピックを指定してブレストから始める
+/create-blog-post --topic "AIエージェント"
+
+# 週刊AIニュースハイライト（従来フロー）
 /create-blog-post --type weekly-ai-news
 
-# 論文解説
+# 論文解説（従来フロー）
 /create-blog-post --type paper-review --url https://arxiv.org/abs/2401.12345
 
-# GitHubプロジェクト紹介
+# GitHubプロジェクト紹介（従来フロー）
 /create-blog-post --type project-intro --repo langchain-ai/langchain
 
-# トピック指定の記事
+# トピック指定の記事（従来フロー）
 /create-blog-post --type tool-tips --topic "Claude Codeの活用法"
+
+# ブリーフから記事を作成
+/create-blog-post --brief docs/briefs/20260216-ai-agent-trends.md
 ```
 
 ## 文体ガイド

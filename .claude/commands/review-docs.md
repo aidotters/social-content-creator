@@ -18,7 +18,7 @@ description: ドキュメント品質レビュー
 
 **出力:**
 - steeringフォルダ指定時: `.steering/[フォルダ名]/review-report.md` に保存（既存ファイルがある場合は `review-report-N.md` で連番付与）
-- それ以外: `.steering/YYYYMMDD-docs-review/review-report.md` に保存（同名フォルダが存在する場合は連番を付与）
+- それ以外: `.steering/YYYYMMDD-docs-review/review-report.md` に保存（同一フォルダ内に既存ファイルがある場合は `review-report-N.md` で連番付与）
 
 ---
 
@@ -555,30 +555,19 @@ if steeringフォルダ指定あり:
     # steeringフォルダ内に保存
     folder = '.steering/[指定されたフォルダ名]'
 
-    # 既存のreview-report.mdがあるか確認
-    Glob('.steering/[フォルダ名]/review-report*.md')
-
-    # 存在する場合はファイル名に連番を付与
-    if 既存レポートあり:
-        filename = 'review-report-N.md'  # Nは次の連番
-    else:
-        filename = 'review-report.md'
-
 else:
     # 日付ベースのフォルダ名（従来の動作）
-    base_folder = '.steering/YYYYMMDD-docs-review'
-
-    # 同名フォルダが存在するか確認
-    Glob('.steering/YYYYMMDD-docs-review*')
-
-    # 存在する場合は連番を付与
-    if 既存フォルダあり:
-        folder = '.steering/YYYYMMDD-docs-review-N'  # Nは次の連番
-    else:
-        folder = base_folder
-
-    filename = 'review-report.md'
+    folder = '.steering/YYYYMMDD-docs-review'
     Bash('mkdir -p {folder}')
+
+# 既存のreview-report.mdがあるか確認
+Glob('{folder}/review-report*.md')
+
+# 存在する場合はファイル名に連番を付与
+if 既存レポートあり:
+    filename = 'review-report-N.md'  # Nは次の連番
+else:
+    filename = 'review-report.md'
 ```
 
 ### 8.2 レポートの保存
@@ -590,21 +579,13 @@ Write('{folder}/{filename}', レポート内容)
 
 ### 8.3 命名規則
 
-**steeringフォルダ指定時:**
+**全モード共通（フォルダは固定、ファイル名に連番付与）:**
 
-| パターン | 例 |
-|----------|------|
-| 初回 | `.steering/20260207-slack-notification/review-report.md` |
-| 2回目 | `.steering/20260207-slack-notification/review-report-2.md` |
-| 3回目 | `.steering/20260207-slack-notification/review-report-3.md` |
-
-**従来（引数なし/ファイル名/モジュール名指定時）:**
-
-| パターン | 例 |
-|----------|------|
-| 初回 | `.steering/20250129-docs-review/review-report.md` |
-| 2回目 | `.steering/20250129-docs-review-2/review-report.md` |
-| 3回目 | `.steering/20250129-docs-review-3/review-report.md` |
+| パターン | 例（steeringフォルダ指定時） | 例（従来モード） |
+|----------|------|------|
+| 初回 | `.steering/20260207-slack-notification/review-report.md` | `.steering/20250129-docs-review/review-report.md` |
+| 2回目 | `.steering/20260207-slack-notification/review-report-2.md` | `.steering/20250129-docs-review/review-report-2.md` |
+| 3回目 | `.steering/20260207-slack-notification/review-report-3.md` | `.steering/20250129-docs-review/review-report-3.md` |
 
 ---
 

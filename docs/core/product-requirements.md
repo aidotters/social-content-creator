@@ -1,6 +1,5 @@
-> **ステータス: 計画段階**
-> このドキュメントは `docs/ideas/20260213-social-content-creator.md` から生成されました。
-> 実装後は `/update-docs` で実態に同期してください。
+> **ステータス: 実装済み**
+> 最終更新: 2026-02-17
 
 # プロダクト要求定義書 (Product Requirements Document)
 
@@ -13,7 +12,7 @@
 - **情報資産の活用**: Notionに蓄積したAI論文要約・ニュース・記事を効率的にコンテンツ化する
 - **最小労力での継続発信**: Claude Codeスキルによる対話的な記事作成で、週2〜3回のコンスタントな発信を実現する
 - **2層アーキテクチャ**: スキル層（Claude Code）とツール層（Python）の分離による柔軟な拡張性
-- **段階的な成長**: ブログ記事（Phase 1）→ X投稿（Phase 2）→ Notion連携（Phase 3）の段階的拡張
+- **段階的な成長**: ブログ記事＋Notion連携（Phase 1）→ X投稿（Phase 2、実装済み）→ Notion連携拡張（Phase 3）の段階的拡張
 
 ### プロダクトビジョン
 フリーランスAIエンジニアが、日常的に蓄積する技術情報を最小限の手間で質の高いコンテンツに変換し、継続的に発信できる環境を実現する。Claude Codeとの対話を通じて、テーマ選定から記事作成・投稿までをシームレスに行い、AIエンジニアとしてのブランド構築とビジネス機会の創出を支援する。
@@ -215,11 +214,18 @@ AIエンジニアとして、自身の株式分析プロジェクトを記事の
 
 ### P2（できれば）: 将来機能
 
-#### 機能8: X（Twitter）投稿
+#### 機能8: X（Twitter）投稿 ✅ 実装済み
 
-記事のサマリーをX投稿として作成・投稿する機能。テキスト・画像・動画付き投稿に対応。
+記事の紹介文をX（Twitter）に投稿する機能。1ツイート投稿およびスレッド投稿に対応。
 
-**優先度**: P2（Phase 2）
+**実装内容**:
+- `XPublisher` クラス（`src/publishers/x.py`）: X API v2を使ったツイート投稿（OAuth 1.0a認証）
+- 1ツイート投稿（280文字以内）とスレッド投稿（複数ツイート連鎖）
+- `/publish-to-x` スキル: 記事ファイルからX紹介文を生成・投稿
+- `/publish-to-wordpress` スキルとの統合（投稿後にX投稿を案内）
+- 文字数バリデーション、リトライ処理、エラーハンドリング
+
+**優先度**: P2（Phase 2）→ 実装済み
 
 #### 機能9: Notion DB連携パイプライン（自動ネタ収集）
 
@@ -333,19 +339,20 @@ P0のNotion DB連携（機能4・5）を発展させ、未使用のネタ候補�
 - [ ] 週2〜3回の記事投稿が30分以内で完了する
 - [ ] 単体テスト・WordPress APIモックテストが存在する
 
-### Phase 2: X投稿（将来）
+### Phase 2: X投稿 ✅ 実装済み
 
-**目標**: 記事のサマリーをXに投稿できる
+**目標**: 記事の紹介文をXに投稿できる
 
 **実装内容**:
-- X API（Twitter API v2）連携
-- テキスト・画像・動画付き投稿
-- Aidottersアカウントでの発信
+- X API v2連携（OAuth 1.0a認証、`XPublisher`）
+- 1ツイート投稿・スレッド投稿
+- `/publish-to-x` スキルによる対話的な投稿フロー
+- `/publish-to-wordpress` スキルとの連携
 
 **成功基準**:
-- [ ] 記事からX投稿用サマリーが生成される
-- [ ] X APIでテキスト投稿ができる
-- [ ] 画像付き投稿ができる
+- [x] 記事からX投稿用紹介文が生成される
+- [x] X APIでテキスト投稿ができる
+- [x] スレッド形式で複数ツイートを連鎖投稿できる
 
 ### Phase 3: Notion DB連携拡張（将来）
 
@@ -366,17 +373,24 @@ P0のNotion DB連携（機能4・5）を発展させ、未使用のネタ候補�
 ### Pythonコード例
 
 ```python
-from social_content_creator.generators.blog_post import BlogPostGenerator
-from social_content_creator.publishers.wordpress import WordPressPublisher
-from social_content_creator.collectors.web_search import WebSearchCollector
+from src.generators.blog_post import BlogPostGenerator
+from src.publishers.wordpress import WordPressPublisher
+from src.collectors.web_search import WebSearchCollector
 
 # 記事生成
-generator = BlogPostGenerator(content_type="weekly-ai-news")
-draft = await generator.generate(topic="2026年2月のAIニュース")
+generator = BlogPostGenerator(base_dir=Path("."))
+template = generator.get_template("weekly-ai-news")
+context = generator.build_prompt_context(template, topic="2026年2月のAIニュース")
+# → スキル層（Claude LLM）が context を基に記事本文を生成
+draft = await generator.generate(
+    content_type="weekly-ai-news",
+    title="2026年2月のAIニュースまとめ",
+    content=generated_content,  # スキル層が生成した記事本文
+    topic="2026年2月のAIニュース",
+)
 
-# レビュー・編集
-print(draft.content)
-draft.content = edited_content  # 対話的に編集
+# ドラフト保存
+draft_path = await generator.save_draft(draft)
 
 # WordPress投稿
 publisher = WordPressPublisher()
