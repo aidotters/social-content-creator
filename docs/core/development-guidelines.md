@@ -432,9 +432,18 @@ WORDPRESS_APP_PASSWORD=your-app-password
 # GitHub（オプション）
 GITHUB_TOKEN=your-github-token
 
+# Gemini APIキー（オプション）
+GEMINI_API_KEY=your-gemini-api-key
+
 # X（Twitter）API — OAuth 1.0a（オプション）
 X_API_KEY=your-x-api-key
 X_API_SECRET=your-x-api-secret
 X_ACCESS_TOKEN=your-x-access-token
 X_ACCESS_TOKEN_SECRET=your-x-access-token-secret
+
+# Notion API
+NOTION_TOKEN=secret_your-notion-integration-token
+NOTION_NEWS_DB_ID=your-google-alerts-db-id
+NOTION_PAPER_DB_ID=your-paper-db-id
+NOTION_MEDIUM_DB_ID=your-medium-db-id
 ```

@@ -33,7 +33,7 @@ uv run mypy src/
 - `src/`: ソースコード
   - `src/models/`: データモデル（BlogPost, CollectedData, PublishResult, XPublishResult, ContentTemplate）
   - `src/generators/`: 記事生成エンジン（BlogPostGenerator）
-  - `src/collectors/`: 情報収集ツール群（URL, GitHub, Gemini, WebSearch, NotionNews, NotionPaper）
+  - `src/collectors/`: 情報収集ツール群（URL, GitHub, Gemini, WebSearch, NotionNews, NotionPaper, NotionMedium）
   - `src/publishers/`: 投稿連携（WordPressPublisher, XPublisher）
   - `src/templates/`: コンテンツタイプ別テンプレート（8種類）
   - `src/utils/`: ユーティリティ（Markdown処理）
@@ -61,6 +61,7 @@ uv run mypy src/
 ### Configuration
 - 環境変数: `.env` (`.env.example` を参照)
 - 設定: `pyproject.toml`
+- Notion API: `NOTION_TOKEN` + 各DB IDが必要（セットアップ手順は README.md 参照）
 
 ## Testing
 - テストフレームワーク: pytest + pytest-asyncio

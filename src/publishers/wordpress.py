@@ -138,9 +138,7 @@ class WordPressPublisher:
             try:
                 result: list[dict[str, object]] = response.json()
             except ValueError as e:
-                raise WordPressPublishError(
-                    message=f"カテゴリ一覧の解析に失敗しました: {e}"
-                ) from e
+                raise WordPressPublishError(message=f"カテゴリ一覧の解析に失敗しました: {e}") from e
             return result
 
     async def get_tags(self) -> list[dict[str, object]]:
@@ -155,9 +153,7 @@ class WordPressPublisher:
             try:
                 result: list[dict[str, object]] = response.json()
             except ValueError as e:
-                raise WordPressPublishError(
-                    message=f"タグ一覧の解析に失敗しました: {e}"
-                ) from e
+                raise WordPressPublishError(message=f"タグ一覧の解析に失敗しました: {e}") from e
             return result
 
     async def _resolve_categories(self, client: httpx.AsyncClient, names: list[str]) -> list[int]:
