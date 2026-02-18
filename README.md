@@ -103,3 +103,53 @@ uv run black .
 | `X_API_SECRET` | X API Secret（オプション） |
 | `X_ACCESS_TOKEN` | X Access Token（オプション） |
 | `X_ACCESS_TOKEN_SECRET` | X Access Token Secret（オプション） |
+| `NOTION_TOKEN` | Notion Integration Token（Notion Collector使用時は必須） |
+| `NOTION_NEWS_DB_ID` | Google Alertニュース DB ID（NotionNewsCollector用） |
+| `NOTION_PAPER_DB_ID` | Arxiv論文 DB ID（NotionPaperCollector用） |
+| `NOTION_MEDIUM_DB_ID` | Medium Daily Digest DB ID（NotionMediumCollector用） |
+
+### Notion API セットアップ
+
+Notion Collector（ニュース・論文・Medium記事の収集）を使用するには、以下の手順でセットアップが必要です。
+
+#### 1. Notion Integration の作成
+
+1. [Notion Integrations](https://www.notion.so/profile/integrations) にアクセス
+2. 「New integration」をクリック
+3. 名前を入力（例: `social-content-creator`）し、関連するワークスペースを選択
+4. 「Capabilities」で「Read content」が有効になっていることを確認
+5. 「Save」をクリックし、表示された `secret_xxx...` トークンをコピー
+
+#### 2. データベースへの接続
+
+各データベースページで Integration を接続します:
+
+1. Notion でデータベースページを開く
+2. 右上の「...」メニュー → 「Connections」→ 作成した Integration を追加
+
+対象データベース:
+
+| Collector | DB名 | 主要プロパティ |
+|---|---|---|
+| NotionNewsCollector | Google Alerts 記事一覧DB | Title, Summary, Source, Tags, URL |
+| NotionPaperCollector | LLM + RAG / FINETUNING | タイトル, 日本語訳, 概要, 公開日, URL |
+| NotionMediumCollector | Medium Daily Digest 記事一覧DB | Title, Japanese Title, Author, Summary, Date, URL |
+
+#### 3. DB ID の確認
+
+データベースページのURLからIDを取得します:
+
+```
+https://www.notion.so/{workspace}/{database_id}?v={view_id}
+                                  ^^^^^^^^^^^^
+                                  この部分がDB ID
+```
+
+#### 4. .env への設定
+
+```bash
+NOTION_TOKEN=secret_xxxxxxxxxxxxxxxxxxxxx
+NOTION_NEWS_DB_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+NOTION_PAPER_DB_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+NOTION_MEDIUM_DB_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```

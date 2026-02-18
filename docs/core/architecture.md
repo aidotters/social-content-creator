@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-13
+> 最終更新: 2026-02-18
 
 # 技術仕様書 (Architecture Design Document)
 
@@ -178,6 +178,10 @@ docs/posts/
   - `X_API_SECRET`: X API Secret（OAuth 1.0a）
   - `X_ACCESS_TOKEN`: X Access Token（OAuth 1.0a）
   - `X_ACCESS_TOKEN_SECRET`: X Access Token Secret（OAuth 1.0a）
+  - `NOTION_TOKEN`: Notion Integration Token
+  - `NOTION_NEWS_DB_ID`: Google Alertニュース DB ID
+  - `NOTION_PAPER_DB_ID`: Arxiv論文 DB ID
+  - `NOTION_MEDIUM_DB_ID`: Medium Daily Digest DB ID
 
 ### 入力検証
 
@@ -232,7 +236,7 @@ docs/posts/
 
 ### セキュリティ制約
 - WordPress Application Passwords の有効期限管理が必要
-- Notion MCP は Claude Code 環境でのみ利用可能
+- Notion API は `NOTION_TOKEN` の有効期限・権限管理が必要
 
 ## 依存関係管理
 

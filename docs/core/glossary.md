@@ -73,7 +73,7 @@
 
 **説明**: Google Alertが配信するニュース記事をNotionに蓄積したもの。`NotionNewsCollector` が過去1週間の記事を取得し、週刊AIニュース等の記事生成ソースとして活用する。
 
-**関連用語**: Notion MCP、NotionNewsCollector、コンテンツタイプ（weekly-ai-news）
+**関連用語**: Notion API、NotionNewsCollector、コンテンツタイプ（weekly-ai-news）
 
 **英語表記**: Google Alert News Database
 
@@ -83,9 +83,19 @@
 
 **説明**: Arxivの論文情報（タイトル、著者、要約、カテゴリ等）をNotionに蓄積したもの。`NotionPaperCollector` が過去1週間の論文リストやテーマ指定での検索結果を取得し、論文レビュー記事の生成ソースとして活用する。
 
-**関連用語**: Notion MCP、NotionPaperCollector、コンテンツタイプ（paper-review）
+**関連用語**: Notion API、NotionPaperCollector、コンテンツタイプ（paper-review）
 
 **英語表記**: Arxiv Paper Database
+
+### Medium Daily Digest DB
+
+**定義**: Notionに構築された、Medium Daily Digestから収集した技術記事の保存データベース
+
+**説明**: Medium Daily Digestで配信される技術記事をNotionに蓄積したもの。`NotionMediumCollector` が過去1週間の記事を取得し、ニュースハイライト等の記事生成ソースとして活用する。
+
+**関連用語**: Notion API、NotionMediumCollector
+
+**英語表記**: Medium Daily Digest Database
 
 ### スタイルガイド (Style Guide)
 
@@ -179,11 +189,11 @@
 
 **本プロジェクトでの用途**: 記事作成のための調査レポート生成。`src/collectors/gemini.py` で連携。
 
-### Notion MCP
+### Notion API（直接呼び出し）
 
-**定義**: Notion APIをModel Context Protocol (MCP)経由で利用する仕組み
+**定義**: Notion Database Query APIをhttpxで直接呼び出す方式
 
-**本プロジェクトでの用途**: Phase 1のコア機能として、Google AlertニュースDB（`NotionNewsCollector`）およびArxiv論文DB（`NotionPaperCollector`）からのデータ取得に使用。記事生成のソースとして活用する。
+**本プロジェクトでの用途**: Google AlertニュースDB（`NotionNewsCollector`）、Arxiv論文DB（`NotionPaperCollector`）、Medium Daily Digest DB（`NotionMediumCollector`）からのデータ取得に使用。共通基底クラス `NotionBaseCollector` でページネーション・プロパティ抽出を統一。環境変数 `NOTION_TOKEN` で認証。
 
 **関連ドキュメント**: `product-requirements.md` - 機能4・5: Notion DB連携
 
@@ -231,7 +241,7 @@
 
 **意味**: AIモデルが外部サービスと連携するためのプロトコル
 
-**本プロジェクトでの使用**: Notion MCP経由でのデータ取得
+**本プロジェクトでの使用**: 各種MCP連携（Playwright MCP等）。Notion連携は直接API呼び出しに移行済み
 
 ### MVP
 
@@ -276,7 +286,7 @@
 
 **定義**: 複数の情報源からデータを収集する際の共通インターフェースパターン
 
-**本プロジェクトでの適用**: `CollectorProtocol` を定義し、WebSearch, URLFetcher, Gemini, NotionNews, NotionPaper, GitHub 等の各Collectorが同一インターフェースでデータを返す。新しい情報源の追加が容易。
+**本プロジェクトでの適用**: `CollectorProtocol` を定義し、WebSearch, URLFetcher, Gemini, NotionNews, NotionPaper, NotionMedium, GitHub 等の各Collectorが同一インターフェースでデータを返す。新しい情報源の追加が容易。
 
 **関連コンポーネント**: `src/collectors/base.py`
 
@@ -346,7 +356,7 @@ stateDiagram-v2
 **定義**: 情報収集結果を表すデータモデル
 
 **主要フィールド**:
-- `source`: 情報源（web_search, url, gemini, github, notion_news, notion_paper）
+- `source`: 情報源（web_search, url, gemini, github, notion_news, notion_paper, notion_medium）
 - `title`: タイトル
 - `content`: 内容
 - `url`: URL

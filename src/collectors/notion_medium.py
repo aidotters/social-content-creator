@@ -1,4 +1,4 @@
-"""Notion Google Alertニュース Collector。"""
+"""Notion Medium Daily Digest Collector。"""
 
 import logging
 import os
@@ -15,23 +15,23 @@ from src.models.blog_post import CollectedData
 logger = logging.getLogger(__name__)
 
 
-class NotionNewsCollector(NotionBaseCollector):
-    """Notion APIでGoogle Alertニュースデータベースを直接クエリするCollector。"""
+class NotionMediumCollector(NotionBaseCollector):
+    """Notion APIでMedium Daily Digestデータベースを直接クエリするCollector。"""
 
     def __init__(
-        self, token: str | None = None, news_db_id: str | None = None
+        self, token: str | None = None, medium_db_id: str | None = None
     ) -> None:
         super().__init__(token=token)
         load_dotenv()
-        self._db_id = news_db_id or os.environ.get("NOTION_NEWS_DB_ID", "")
+        self._db_id = medium_db_id or os.environ.get("NOTION_MEDIUM_DB_ID", "")
         if not self._db_id:
             raise CollectionError(
-                source="notion_news",
-                message="NOTION_NEWS_DB_IDが未設定です。",
+                source="notion_medium",
+                message="NOTION_MEDIUM_DB_IDが未設定です。",
             )
 
     async def collect(self, query: str, **kwargs: object) -> list[CollectedData]:
-        """Google Alertニュースを収集する。
+        """Medium Daily Digestの記事を収集する。
 
         Args:
             query: フィルタキーワード（空文字で全件）
@@ -44,11 +44,11 @@ class NotionNewsCollector(NotionBaseCollector):
         days_val = kwargs.get("days", 7)
         days = int(days_val) if isinstance(days_val, (int, str)) else 7
         cutoff = datetime.now(UTC) - timedelta(days=days)
-        cutoff_str = cutoff.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        cutoff_str = cutoff.strftime("%Y-%m-%d")
 
         filter_obj: dict[str, Any] = {
-            "timestamp": "created_time",
-            "created_time": {"on_or_after": cutoff_str},
+            "property": "Date",
+            "date": {"on_or_after": cutoff_str},
         }
 
         try:
@@ -57,43 +57,39 @@ class NotionNewsCollector(NotionBaseCollector):
                     client,
                     self._db_id,
                     filter_obj=filter_obj,
-                    sorts=[{"timestamp": "created_time", "direction": "descending"}],
+                    sorts=[{"property": "Date", "direction": "descending"}],
                 )
         except CollectionError:
             raise
         except httpx.HTTPError as e:
-            raise CollectionError(source="notion_news", message=str(e)) from e
+            raise CollectionError(source="notion_medium", message=str(e)) from e
 
         collected: list[CollectedData] = []
         for page in pages:
             props = page.get("properties", {})
 
             title = self._extract_title(props, "Title")
-            original_title = self._extract_rich_text(props, "Original Title")
+            japanese_title = self._extract_rich_text(props, "Japanese Title")
+            author = self._extract_rich_text(props, "Author")
             summary = self._extract_rich_text(props, "Summary")
-            snippet = self._extract_rich_text(props, "Snippet")
-            source = self._extract_rich_text(props, "Source")
-            tags = self._extract_multi_select(props, "Tags")
             url = self._extract_url(props, "URL")
 
-            display_title = title or original_title or "Untitled"
+            display_title = japanese_title or title or "Untitled"
 
             if query:
-                searchable = f"{display_title} {summary} {snippet}".lower()
+                searchable = f"{title} {japanese_title} {summary} {author}".lower()
                 if query.lower() not in searchable:
                     continue
 
             content_parts = []
             if summary:
                 content_parts.append(summary)
-            if source:
-                content_parts.append(f"Source: {source}")
-            if tags:
-                content_parts.append(f"Tags: {', '.join(tags)}")
+            if author:
+                content_parts.append(f"Author: {author}")
 
             collected.append(
                 CollectedData(
-                    source="notion_news",
+                    source="notion_medium",
                     title=display_title,
                     url=url or None,
                     content="\n".join(content_parts),

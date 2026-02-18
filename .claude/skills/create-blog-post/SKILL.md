@@ -58,9 +58,39 @@ description: ブログ記事の生成・レビュー・投稿を一括で行う�
 
 トピックが指定されていればそこを起点に、なければ以下をソースにしてネタを広げる。
 
-- **Notion MCP** でストックしたニュース・論文・記事を検索
+- **Notion API** でストックしたニュース・論文・Medium記事を検索
+  ```bash
+  # Google Alertニュース
+  uv run python -c "
+  import asyncio, json
+  from src.collectors.notion_news import NotionNewsCollector
+  c = NotionNewsCollector()
+  results = asyncio.run(c.collect('${KEYWORD}', days=14))
+  for r in results:
+      print(json.dumps({'title': r.title, 'url': r.url, 'content': r.content[:200]}, ensure_ascii=False))
+  "
   ```
-  mcp__claude_ai_Notion__search で関連データベースを検索
+  ```bash
+  # Arxiv論文
+  uv run python -c "
+  import asyncio, json
+  from src.collectors.notion_paper import NotionPaperCollector
+  c = NotionPaperCollector()
+  results = asyncio.run(c.collect('${KEYWORD}', days=14))
+  for r in results:
+      print(json.dumps({'title': r.title, 'url': r.url, 'content': r.content[:200]}, ensure_ascii=False))
+  "
+  ```
+  ```bash
+  # Medium Daily Digest
+  uv run python -c "
+  import asyncio, json
+  from src.collectors.notion_medium import NotionMediumCollector
+  c = NotionMediumCollector()
+  results = asyncio.run(c.collect('${KEYWORD}', days=14))
+  for r in results:
+      print(json.dumps({'title': r.title, 'url': r.url, 'content': r.content[:200]}, ensure_ascii=False))
+  "
   ```
 - **WebSearch** で最新トレンドを調査
 - **ユーザーとの対話** で関心領域を掘り下げる
@@ -136,19 +166,69 @@ status: confirmed
 
 3. **タイプに応じた情報収集**を行う
    - `weekly-ai-news`:
-     1. Notion MCP経由でGoogle Alertニュース取得（過去7日間）
+     1. Notion API経由でGoogle Alertニュース取得（過去7日間）
+        ```bash
+        uv run python -c "
+        import asyncio, json
+        from src.collectors.notion_news import NotionNewsCollector
+        c = NotionNewsCollector()
+        results = asyncio.run(c.collect('', days=7))
+        for r in results:
+            print(json.dumps({'title': r.title, 'url': r.url, 'content': r.content[:200]}, ensure_ascii=False))
+        "
         ```
-        mcp__claude_ai_Notion__search でGoogle Alertデータベースを検索
+     2. Notion API経由でMedium Daily Digest取得（過去7日間）
+        ```bash
+        uv run python -c "
+        import asyncio, json
+        from src.collectors.notion_medium import NotionMediumCollector
+        c = NotionMediumCollector()
+        results = asyncio.run(c.collect('', days=7))
+        for r in results:
+            print(json.dumps({'title': r.title, 'url': r.url, 'content': r.content[:200]}, ensure_ascii=False))
+        "
         ```
-     2. WebSearchで最新AIニュースを検索
+     3. WebSearchで最新AIニュースを検索
+     4. **ソース選定基準**（情報の信頼性を担保するため、以下を厳守する）:
+        - **一次情報を優先**: 当事者（企業・研究機関・開発者本人）による公式発表・プレスリリース・公式ブログを最優先で採用する
+        - **信頼できるメディアのみ許可**: 大手ニュースメディア（日経、WSJ等）、専門テックメディア（Impress、TechCrunch、The Verge等）、学術機関の発表に限定する
+        - **個人ブログは不可**: 個人が運営するブログ・個人サイトの記事はソースとして使用しない。ニュースの存在を知るきっかけが個人ブログであっても、必ず原典（公式発表や信頼できるメディアの報道）を探してそちらを参考リンクとする
+        - **判断に迷う場合**: ドメインや運営元が不明確なサイトは避け、より信頼性の高い代替ソースを探す
    - `paper-review`:
      1. `--url` が指定されていればURLの内容を取得
-     2. Notion MCP経由でArxiv論文データベースを検索
+     2. Notion API経由でArxiv論文データベースを検索
+        ```bash
+        uv run python -c "
+        import asyncio, json
+        from src.collectors.notion_paper import NotionPaperCollector
+        c = NotionPaperCollector()
+        results = asyncio.run(c.collect('${KEYWORD}', days=14))
+        for r in results:
+            print(json.dumps({'title': r.title, 'url': r.url, 'content': r.content[:200]}, ensure_ascii=False))
+        "
+        ```
+     3. WebSearchで論文の関連情報・解説・引用状況を検索
    - `project-intro`:
      1. `--repo` のGitHub情報を取得
    - その他:
-     1. `--topic` に基づいてWebSearchで情報収集
-     2. `--url` があれば内容を取得
+     1. `--topic` に基づいてNotion API経由でニュース・論文・Medium記事を検索（関連トピックがある場合）
+        ```bash
+        uv run python -c "
+        import asyncio, json
+        from src.collectors.notion_news import NotionNewsCollector
+        from src.collectors.notion_paper import NotionPaperCollector
+        from src.collectors.notion_medium import NotionMediumCollector
+        async def main():
+            for name, C in [('news', NotionNewsCollector), ('paper', NotionPaperCollector), ('medium', NotionMediumCollector)]:
+                c = C()
+                results = await c.collect('${TOPIC}', days=14)
+                for r in results[:10]:
+                    print(json.dumps({'source': name, 'title': r.title, 'url': r.url}, ensure_ascii=False))
+        asyncio.run(main())
+        "
+        ```
+     2. `--topic` に基づいてWebSearchで情報収集
+     3. `--url` があれば内容を取得
 
 ### ステップ2: 記事の生成
 

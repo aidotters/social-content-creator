@@ -36,9 +36,7 @@ class _OAuth1AuthJsonFix(OAuth1Auth):  # type: ignore[misc]
         if not body and original_body:
             body = original_body
         headers["Content-Length"] = str(len(body))
-        yield build_request(
-            url=url, headers=headers, body=body, initial_request=request
-        )
+        yield build_request(url=url, headers=headers, body=body, initial_request=request)
 
 
 class XPublisher:
@@ -163,9 +161,7 @@ class XPublisher:
                 try:
                     data: dict[str, object] = response.json()
                 except ValueError as e:
-                    raise XPublishError(
-                        message=f"レスポンスの解析に失敗しました: {e}"
-                    ) from e
+                    raise XPublishError(message=f"レスポンスの解析に失敗しました: {e}") from e
                 return data
 
             except XPublishError:

@@ -22,9 +22,7 @@ class TestGitHubCollectorInit:
             GitHubCollector(token="")
         assert "GITHUB_TOKEN" in caplog.text
 
-    def test_with_token_no_warning(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_with_token_no_warning(self, caplog: pytest.LogCaptureFixture) -> None:
         """GITHUB_TOKEN設定時に警告ログが出力されない。"""
         with caplog.at_level(logging.WARNING):
             GitHubCollector(token="valid-token")

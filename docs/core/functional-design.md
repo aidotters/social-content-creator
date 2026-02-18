@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-17
+> 最終更新: 2026-02-18
 
 # 機能設計書 (Functional Design Document)
 
@@ -19,7 +19,7 @@ graph TB
     WebSearch[Web検索]
     URLFetcher[URL取得・解析]
     GeminiCLI[Gemini CLI]
-    NotionMCP[Notion MCP]
+    NotionAPI[Notion API]
     GitHubAPI[GitHub API]
 
     WordPress[WordPress REST API]
@@ -36,7 +36,7 @@ graph TB
     Collector --> WebSearch
     Collector --> URLFetcher
     Collector --> GeminiCLI
-    Collector --> NotionMCP
+    Collector --> NotionAPI
     Collector --> GitHubAPI
 
     Publisher --> WordPress
@@ -130,7 +130,7 @@ def list_templates() -> list[ContentTemplate]:
 ```python
 class CollectedData(BaseModel):
     """情報収集結果"""
-    source: str                             # 情報源（web_search, url, gemini, notion, github）
+    source: str                             # 情報源（web_search, url, gemini, notion_news, notion_paper, notion_medium, github）
     title: str                              # タイトル
     url: str | None = None                  # URL
     content: str                            # 内容
@@ -336,13 +336,19 @@ class CollectorProtocol(Protocol):
 - `WebSearchCollector`: Web検索による情報収集
 - `URLFetcherCollector`: 指定URLの内容取得・要約
 - `GeminiCollector`: Gemini CLI経由の調査レポート生成
-- `NotionNewsCollector`: Notion MCP経由でGoogle Alertニュース記事を取得（過去1週間）
-- `NotionPaperCollector`: Notion MCP経由でArxiv論文データを取得（テーマ指定/過去1週間）
+- `NotionNewsCollector`: Notion API経由でGoogle Alertニュース記事を取得（過去1週間）
+- `NotionPaperCollector`: Notion API経由でArxiv論文データを取得（テーマ指定/過去1週間）
+- `NotionMediumCollector`: Notion API経由でMedium Daily Digest記事を取得（過去1週間）
 - `GitHubCollector`: GitHub API経由のリポジトリ情報取得
+
+**共通基底クラス**: `NotionBaseCollector`（`notion_base.py`）
+- Notion Database Query API呼び出し（ページネーション対応）
+- プロパティ抽出ヘルパー（title, rich_text, url, date, multi_select, number, checkbox, select）
+- `NOTION_TOKEN` による認証
 
 **依存関係**:
 - httpx（HTTP通信）
-- Notion MCP（NotionNewsCollector, NotionPaperCollector）
+- Notion API（NotionNewsCollector, NotionPaperCollector, NotionMediumCollector）
 - 各外部API
 
 ## ユースケース図
@@ -537,15 +543,18 @@ src/templates/
 - WordPressPublisher: API呼び出し（モック）、レスポンスパース
 - XPublisher: ツイート投稿（モック）、スレッド投稿、文字数バリデーション、エラーハンドリング
 - Collector群: 各情報源からのデータ取得（モック）
-  - NotionNewsCollector: Google Alertニュース取得（過去1週間フィルタ）
-  - NotionPaperCollector: Arxiv論文取得（テーマ指定/期間指定）
+  - NotionBaseCollector: 共通ヘルパー（プロパティ抽出、ページネーション）
+  - NotionNewsCollector: Google Alertニュース取得（created_timeフィルタ）
+  - NotionPaperCollector: Arxiv論文取得（公開日フィルタ/テーマ指定）
+  - NotionMediumCollector: Medium Daily Digest取得（Dateフィルタ/テーマ指定）
 - ContentTemplate: テンプレートのロード・バリデーション
 
 ### 統合テスト
 - 記事生成→ローカル保存の一連フロー
 - 情報収集→記事生成の連携
-- Notion DB取得→週刊AIニュース記事生成の連携
-- Notion DB取得→論文レビュー記事生成の連携
+- Notion API→週刊AIニュース記事生成の連携
+- Notion API→論文レビュー記事生成の連携
+- Notion API→Medium記事取得の連携
 - テンプレート選択→記事構成の整合性
 
 ### E2Eテスト

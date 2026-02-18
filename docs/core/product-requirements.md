@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-17
+> 最終更新: 2026-02-18
 
 # プロダクト要求定義書 (Product Requirements Document)
 
@@ -12,7 +12,7 @@
 - **情報資産の活用**: Notionに蓄積したAI論文要約・ニュース・記事を効率的にコンテンツ化する
 - **最小労力での継続発信**: Claude Codeスキルによる対話的な記事作成で、週2〜3回のコンスタントな発信を実現する
 - **2層アーキテクチャ**: スキル層（Claude Code）とツール層（Python）の分離による柔軟な拡張性
-- **段階的な成長**: ブログ記事＋Notion連携（Phase 1）→ X投稿（Phase 2、実装済み）→ Notion連携拡張（Phase 3）の段階的拡張
+- **段階的な成長**: ブログ記事＋Notion連携（Phase 1）→ X投稿（Phase 2、実装済み）→ Notion連携拡張（Phase 3、3項目中1項目完了）の段階的拡張
 
 ### プロダクトビジョン
 フリーランスAIエンジニアが、日常的に蓄積する技術情報を最小限の手間で質の高いコンテンツに変換し、継続的に発信できる環境を実現する。Claude Codeとの対話を通じて、テーマ選定から記事作成・投稿までをシームレスに行い、AIエンジニアとしてのブランド構築とビジネス機会の創出を支援する。
@@ -148,7 +148,7 @@ AIエンジニアとして、生成した記事をそのままブログに投稿
 AIエンジニアとして、Notionに蓄積したGoogle Alertのニュース記事を記事のソースとして活用するために、過去1週間の記事を取得できる仕組みが欲しい
 
 **受け入れ条件**:
-- [ ] Notion MCP経由でGoogle Alert記事保存データベースに接続できる
+- [ ] Notion API経由でGoogle Alert記事保存データベースに接続できる
 - [ ] 過去1週間の記事一覧を取得できる
 - [ ] 取得結果をClaude Codeスキルから利用できる（記事生成のソースとして渡せる）
 - [ ] 記事のタイトル・URL・保存日時・要約が取得できる
@@ -169,7 +169,7 @@ AIエンジニアとして、Notionに蓄積したGoogle Alertのニュース記
 AIエンジニアとして、Notionに蓄積したArxiv論文データを記事のソースとして活用するために、テーマ指定や期間指定で論文リストを取得できる仕組みが欲しい
 
 **受け入れ条件**:
-- [ ] Notion MCP経由でArxiv論文データベースに接続できる
+- [ ] Notion API経由でArxiv論文データベースに接続できる
 - [ ] 過去1週間の論文リストを取得できる
 - [ ] 特定テーマ（キーワード）で論文をフィルタリングできる
 - [ ] 取得結果をClaude Codeスキルから利用できる（論文レビュー記事のソースとして渡せる）
@@ -247,10 +247,10 @@ P0のNotion DB連携（機能4・5）を発展させ、未使用のネタ候補�
 /create-blog-post --type cv --topic "YOLOv8で物体検出を試してみた"
 /create-blog-post --topic "LangChainの最新アップデート"
 
-# Notion DB連携（記事ソースの取得）
-/fetch-notion-news                          # Google Alert過去1週間のニュース取得
-/fetch-notion-papers                        # Arxiv論文 過去1週間のリスト取得
-/fetch-notion-papers --topic "LLM"          # Arxiv論文 テーマ指定で取得
+# Notion DB連携（記事ソースの取得）※以下は想定CLIコマンド（未実装。実際はPython APIとして実装済みで、/create-blog-post スキル経由で利用）
+# /fetch-notion-news                        # Google Alert過去1週間のニュース取得
+# /fetch-notion-papers                      # Arxiv論文 過去1週間のリスト取得
+# /fetch-notion-papers --topic "LLM"        # Arxiv論文 テーマ指定で取得
 ```
 
 ## 非機能要件
@@ -290,7 +290,7 @@ P0のNotion DB連携（機能4・5）を発展させ、未使用のネタ候補�
 | HTTP通信 | httpx | async対応、モダンなHTTPクライアント |
 | スキル層 | Claude Code Skills | 対話的な操作、柔軟な拡張性 |
 | ブログ投稿 | WordPress REST API | お名前.comサーバーで構築予定 |
-| 情報収集 | Gemini CLI / Web検索 / Notion MCP | 柔軟な情報源 |
+| 情報収集 | Gemini CLI / Web検索 / Notion API | 柔軟な情報源 |
 | テスト | pytest | Python標準テストフレームワーク |
 | Lint/Format | Ruff / Black | 高速なLint・フォーマット |
 | 型チェック | mypy | 静的型チェック |
@@ -354,17 +354,17 @@ P0のNotion DB連携（機能4・5）を発展させ、未使用のネタ候補�
 - [x] X APIでテキスト投稿ができる
 - [x] スレッド形式で複数ツイートを連鎖投稿できる
 
-### Phase 3: Notion DB連携拡張（将来）
+### Phase 3: Notion DB連携拡張（3項目中1項目完了）
 
 **目標**: Phase 1のNotion DB連携を発展させ、自動ネタ収集・レコメンドパイプラインを構築する
 
 **実装内容**:
-- Medium記事DBとの連携追加
+- ✅ Medium記事DBとの連携追加（`NotionMediumCollector` 実装済み）
 - 未使用ネタの自動候補リスト生成・レコメンド
 - 使用済みネタのステータス自動更新
 
 **成功基準**:
-- [ ] Medium記事DBからもネタ候補が収集される
+- [x] Medium記事DBからもネタ候補が収集される
 - [ ] 未使用のネタ候補が自動的にリスト化される
 - [ ] 使用済みネタのステータスが更新される
 

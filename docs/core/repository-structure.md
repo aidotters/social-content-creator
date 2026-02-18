@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-13
+> 最終更新: 2026-02-18
 
 # リポジトリ構造定義書 (Repository Structure Document)
 
@@ -26,8 +26,10 @@ social-content-creator/
 │   │   ├── web_search.py
 │   │   ├── url_fetcher.py
 │   │   ├── gemini.py
+│   │   ├── notion_base.py          # Notion API共通基底クラス
 │   │   ├── notion_news.py          # Notion Google Alertニュース取得
 │   │   ├── notion_paper.py         # Notion Arxiv論文取得
+│   │   ├── notion_medium.py        # Notion Medium Daily Digest取得
 │   │   └── github.py
 │   ├── publishers/             # 投稿先プラットフォーム連携
 │   │   ├── __init__.py
@@ -64,8 +66,10 @@ social-content-creator/
 │   │   │   ├── test_web_search.py
 │   │   │   ├── test_url_fetcher.py
 │   │   │   ├── test_gemini.py
+│   │   │   ├── test_notion_base.py
 │   │   │   ├── test_notion_news.py
 │   │   │   ├── test_notion_paper.py
+│   │   │   ├── test_notion_medium.py
 │   │   │   └── test_github.py
 │   │   ├── publishers/
 │   │   │   ├── test_wordpress.py
@@ -146,8 +150,10 @@ generators/
 - `web_search.py`: Web検索による情報収集
 - `url_fetcher.py`: 指定URLの内容取得
 - `gemini.py`: Gemini CLI経由の調査レポート生成
-- `notion_news.py`: Notion MCP経由でGoogle Alertニュース記事を取得
-- `notion_paper.py`: Notion MCP経由でArxiv論文データを取得
+- `notion_base.py`: Notion API共通基底クラス（DB Query、ページネーション、プロパティ抽出）
+- `notion_news.py`: Notion API経由でGoogle Alertニュース記事を取得
+- `notion_paper.py`: Notion API経由でArxiv論文データを取得
+- `notion_medium.py`: Notion API経由でMedium Daily Digest記事を取得
 - `github.py`: GitHub API経由のリポジトリ情報取得
 
 **命名規則**:
@@ -166,8 +172,10 @@ collectors/
 ├── web_search.py       # WebSearchCollector
 ├── url_fetcher.py      # URLFetcherCollector
 ├── gemini.py           # GeminiCollector
+├── notion_base.py      # NotionBaseCollector（共通基底）
 ├── notion_news.py      # NotionNewsCollector
 ├── notion_paper.py     # NotionPaperCollector
+├── notion_medium.py    # NotionMediumCollector
 └── github.py           # GitHubCollector
 ```
 
@@ -259,8 +267,10 @@ tests/unit/
 │   ├── test_web_search.py
 │   ├── test_url_fetcher.py
 │   ├── test_gemini.py
+│   ├── test_notion_base.py
 │   ├── test_notion_news.py
 │   ├── test_notion_paper.py
+│   ├── test_notion_medium.py
 │   └── test_github.py
 ├── publishers/
 │   ├── test_wordpress.py

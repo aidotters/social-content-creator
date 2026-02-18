@@ -20,10 +20,11 @@ description: 実装済みコードに基づきdocs/core/、CLAUDE.md、README.md
 - `/update-docs [steeringフォルダ]` - 指定されたsteeringフォルダの実装内容に基づいて関連ドキュメントのみ更新
   - 例: `/update-docs .steering/20260207-slack-notification/`
   - 例: `/update-docs 20260207-slack-notification`（`.steering/`プレフィックス省略可）
-- `/update-docs [レビューレポート]` - レビューレポートファイル（例: `.steering/20250129-docs-review/review-report.md`）の指摘事項に沿って修正
+- `/update-docs --from-report [ファイルパス]` - レビューレポートの指摘事項に沿って修正
+  - 例: `/update-docs --from-report .steering/20260129-docs-review/review-report.md`
 
 **モード判定:**
-1. 引数が `.steering/**/review-report.md` パターンに一致する場合 → **レビュー結果修正モード**
+1. `--from-report` フラグが指定されている場合 → **レビュー結果修正モード**
 2. 引数が `YYYYMMDD-` 形式で始まる、または `.steering/YYYYMMDD-*/` パターンに一致する場合 → **Steeringフォルダモード**
 3. それ以外 → **通常モード**（従来の動作）
 
@@ -31,9 +32,9 @@ description: 実装済みコードに基づきdocs/core/、CLAUDE.md、README.md
 
 ## モード別処理フロー
 
-### レビュー結果修正モード（レビューレポート指定時）
+### レビュー結果修正モード（--from-report 指定時）
 
-引数が `.steering/**/review-report.md` に該当する場合、以下のステップを実行:
+`--from-report` フラグが指定された場合、以下のステップを実行:
 
 1. **ステップR1:** レビューレポートの読み込みと解析
 2. **ステップR2:** 指摘事項の分類と優先度付け
@@ -409,7 +410,7 @@ Edit('docs/core/product-requirements.md')
     ↓
 /review-docs
     ↓ （品質レビュー）
-/update-docs {レビューレポート} ← ここ（レビュー結果修正モード）
+/update-docs --from-report {レビューレポート} ← ここ（レビュー結果修正モード）
     ↓ （指摘事項の修正）
 コード完成
 ```
@@ -423,7 +424,7 @@ Edit('docs/core/product-requirements.md')
 推奨ワークフロー:
 1. `/update-docs .steering/YYYYMMDD-feature-name/` で実装した機能のドキュメントを同期（Steeringフォルダモード）
 2. `/review-docs` でドキュメント品質をレビュー
-3. `/update-docs .steering/YYYYMMDD-docs-review/review-report.md` でレビュー指摘を修正
+3. `/update-docs --from-report .steering/YYYYMMDD-docs-review/review-report.md` でレビュー指摘を修正
 4. 必要に応じて2-3を繰り返す
 5. 全体的な整合性確認が必要な場合は `/update-docs`（通常モード）を実行
 
@@ -626,7 +627,7 @@ for ドキュメント in 更新対象ドキュメント:
 ### R1.1 レポートファイルの検証
 
 ```
-# 指定されたファイルが存在するか確認
+# 特定されたファイルが存在するか確認
 Read('{レビューレポートパス}')
 
 # 有効なレビューレポートかを確認

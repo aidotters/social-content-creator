@@ -145,9 +145,7 @@ class TestPublish:
         assert mock_post.call_args[0][0] == "タイトルのみ"
 
     @respx.mock
-    async def test_publish_auth_error(
-        self, publisher: XPublisher, blog_post: BlogPost
-    ) -> None:
+    async def test_publish_auth_error(self, publisher: XPublisher, blog_post: BlogPost) -> None:
         """認証エラー時にXPublishErrorが発生する。"""
         respx.post(f"{X_API_BASE}/tweets").mock(
             return_value=httpx.Response(401, json={"detail": "Unauthorized"})
@@ -182,9 +180,7 @@ class TestPublish:
 
         assert respx.calls.call_count == 2  # 初回 + リトライ1回
 
-    async def test_publish_text_too_long(
-        self, publisher: XPublisher, blog_post: BlogPost
-    ) -> None:
+    async def test_publish_text_too_long(self, publisher: XPublisher, blog_post: BlogPost) -> None:
         """文字数超過時にValueErrorが発生する。"""
         with pytest.raises(ValueError, match="超過"):
             await publisher.publish(blog_post, text="a" * 281)
@@ -194,9 +190,7 @@ class TestPublishThread:
     """スレッド投稿のテスト。"""
 
     @respx.mock
-    async def test_thread_three_tweets(
-        self, publisher: XPublisher, blog_post: BlogPost
-    ) -> None:
+    async def test_thread_three_tweets(self, publisher: XPublisher, blog_post: BlogPost) -> None:
         """3件のスレッド投稿が順番に実行される。"""
         call_count = 0
 
@@ -207,9 +201,7 @@ class TestPublishThread:
 
         respx.post(f"{X_API_BASE}/tweets").mock(side_effect=make_response)
 
-        result = await publisher.publish_thread(
-            blog_post, ["ツイート1", "ツイート2", "ツイート3"]
-        )
+        result = await publisher.publish_thread(blog_post, ["ツイート1", "ツイート2", "ツイート3"])
 
         assert result.success is True
         assert result.thread_ids == ["t1", "t2", "t3"]
@@ -222,9 +214,7 @@ class TestPublishThread:
         """2件目以降が前のツイートへのリプライとして投稿される。"""
         call_count = 0
 
-        async def fake_post_tweet(
-            text: str, reply_to: str | None = None
-        ) -> dict[str, object]:
+        async def fake_post_tweet(text: str, reply_to: str | None = None) -> dict[str, object]:
             nonlocal call_count
             call_count += 1
             return {"data": {"id": f"t{call_count}"}}
@@ -240,9 +230,7 @@ class TestPublishThread:
         # 3件目は2件目へのリプライ
         assert mock_post.call_args_list[2] == mocker.call("3件目", reply_to="t2")
 
-    def test_thread_text_validation(
-        self, publisher: XPublisher, blog_post: BlogPost
-    ) -> None:
+    def test_thread_text_validation(self, publisher: XPublisher, blog_post: BlogPost) -> None:
         """スレッド内の文字数超過でValueErrorが発生する。"""
         with pytest.raises(ValueError, match="超過"):
             import asyncio
@@ -252,9 +240,7 @@ class TestPublishThread:
             )
 
     @respx.mock
-    async def test_thread_ids_recorded(
-        self, publisher: XPublisher, blog_post: BlogPost
-    ) -> None:
+    async def test_thread_ids_recorded(self, publisher: XPublisher, blog_post: BlogPost) -> None:
         """thread_idsに全ツイートIDが記録される。"""
         call_count = 0
 
@@ -278,9 +264,7 @@ class TestPostTweetErrorHandling:
     async def test_general_4xx_error_with_detail(self, publisher: XPublisher) -> None:
         """一般4xxエラー時にレスポンスのdetailが含まれる。"""
         respx.post(f"{X_API_BASE}/tweets").mock(
-            return_value=httpx.Response(
-                400, json={"detail": "Bad Request: invalid text"}
-            )
+            return_value=httpx.Response(400, json={"detail": "Bad Request: invalid text"})
         )
 
         with pytest.raises(XPublishError, match="Bad Request: invalid text"):
@@ -299,9 +283,7 @@ class TestPostTweetErrorHandling:
     @respx.mock
     async def test_general_4xx_error_invalid_json(self, publisher: XPublisher) -> None:
         """一般4xxエラーでJSON解析に失敗した場合のフォールバック。"""
-        respx.post(f"{X_API_BASE}/tweets").mock(
-            return_value=httpx.Response(400, text="not json")
-        )
+        respx.post(f"{X_API_BASE}/tweets").mock(return_value=httpx.Response(400, text="not json"))
 
         with pytest.raises(XPublishError, match="投稿に失敗しました"):
             await publisher._post_tweet("テスト")
@@ -309,9 +291,7 @@ class TestPostTweetErrorHandling:
     @respx.mock
     async def test_success_response_invalid_json(self, publisher: XPublisher) -> None:
         """成功レスポンスでJSON解析に失敗した場合。"""
-        respx.post(f"{X_API_BASE}/tweets").mock(
-            return_value=httpx.Response(201, text="not json")
-        )
+        respx.post(f"{X_API_BASE}/tweets").mock(return_value=httpx.Response(201, text="not json"))
 
         with pytest.raises(XPublishError, match="レスポンスの解析に失敗"):
             await publisher._post_tweet("テスト")
