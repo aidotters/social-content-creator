@@ -4,6 +4,8 @@ import asyncio
 import os
 import typing
 
+import re
+
 import httpx
 from authlib.integrations.httpx_client import OAuth1Auth
 from authlib.integrations.httpx_client.utils import build_request
@@ -15,6 +17,23 @@ from src.models.blog_post import BlogPost, PublishResult, XPublishResult
 X_API_BASE = "https://api.x.com/2"
 MAX_TWEET_LENGTH = 280
 THREAD_WAIT_SECONDS = 0.1
+
+# X加重文字数でカウントされるCJK / 絵文字のコードポイント範囲
+_WEIGHTED_RANGES = (
+    (0x1100, 0x11FF),  # Hangul Jamo
+    (0x2E80, 0x9FFF),  # CJK Radicals 〜 CJK Unified Ideographs
+    (0xAC00, 0xD7FF),  # Hangul Syllables
+    (0xF900, 0xFAFF),  # CJK Compatibility Ideographs
+    (0xFE30, 0xFE4F),  # CJK Compatibility Forms
+    (0xFF00, 0xFFEF),  # Halfwidth and Fullwidth Forms
+    (0x3000, 0x303F),  # CJK Symbols and Punctuation
+    (0x3040, 0x309F),  # Hiragana
+    (0x30A0, 0x30FF),  # Katakana
+    (0x1F000, 0x1FFFF),  # Emoticons / Emoji
+    (0x20000, 0x2FA1F),  # CJK Extension
+)
+
+_URL_WEIGHT = 23  # t.co短縮URLの固定長
 
 
 class _OAuth1AuthJsonFix(OAuth1Auth):  # type: ignore[misc]
@@ -80,14 +99,40 @@ class XPublisher:
             token_secret=self._access_token_secret,
         )
 
+    @staticmethod
+    def weighted_length(text: str) -> int:
+        """Xの加重文字数を計算する。
+
+        CJK文字・絵文字は2文字、URLはt.co短縮で23文字、その他は1文字。
+        """
+        url_pattern = re.compile(r"https?://\S+")
+        urls = url_pattern.findall(text)
+        text_no_url = url_pattern.sub("", text)
+
+        count = 0
+        for char in text_no_url:
+            cp = ord(char)
+            if any(lo <= cp <= hi for lo, hi in _WEIGHTED_RANGES):
+                count += 2
+            else:
+                count += 1
+
+        count += len(urls) * _URL_WEIGHT
+        return count
+
     def validate_text(self, text: str) -> None:
-        """テキストの文字数バリデーション。"""
+        """テキストの加重文字数バリデーション。
+
+        Xでは日本語・CJK文字・絵文字を2文字、URLをt.co短縮で23文字としてカウントする。
+        """
         if not text:
             raise ValueError("投稿テキストが空です。")
-        if len(text) > MAX_TWEET_LENGTH:
-            over = len(text) - MAX_TWEET_LENGTH
+        wlen = self.weighted_length(text)
+        if wlen > MAX_TWEET_LENGTH:
+            over = wlen - MAX_TWEET_LENGTH
             raise ValueError(
-                f"投稿テキストが{MAX_TWEET_LENGTH}文字を超えています（{over}文字超過）。"
+                f"投稿テキストが{MAX_TWEET_LENGTH}文字を超えています"
+                f"（加重文字数{wlen}、{over}文字超過）。"
             )
 
     async def _post_tweet(

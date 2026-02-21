@@ -85,7 +85,7 @@ class WordPressPublisher:
                     "slug": post.slug,
                 }
                 if post.subtitle:
-                    payload["meta"] = {"subtitle": post.subtitle}
+                    payload["excerpt"] = post.subtitle
                 if category_ids:
                     payload["categories"] = category_ids
                 if tag_ids:
@@ -117,10 +117,25 @@ class WordPressPublisher:
                     raise WordPressPublishError(
                         message=f"レスポンスの解析に失敗しました: {e}"
                     ) from e
+
+                post_id = data.get("id")
+                post_url = data.get("link", "")
+
+                if post.subtitle and post_id and post_url:
+                    excerpt_with_more = (
+                        f"{post.subtitle}… "
+                        f'<a class="more-link" href="{post_url}">続きを読む</a>'
+                    )
+                    await client.post(
+                        f"{self.api_base}/posts/{post_id}",
+                        json={"excerpt": excerpt_with_more},
+                        headers=self._auth_header(),
+                    )
+
                 return PublishResult(
                     success=True,
-                    post_id=data.get("id"),
-                    url=data.get("link"),
+                    post_id=post_id,
+                    url=post_url,
                 )
 
         except WordPressPublishError:

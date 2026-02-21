@@ -68,19 +68,44 @@ class TestXPublisherInit:
         assert publisher._access_token_secret == "ts"
 
 
+class TestWeightedLength:
+    """加重文字数計算のテスト。"""
+
+    def test_ascii_only(self, publisher: XPublisher) -> None:
+        """ASCII文字は1文字=1カウント。"""
+        assert publisher.weighted_length("hello") == 5
+
+    def test_japanese_double_weight(self, publisher: XPublisher) -> None:
+        """日本語は1文字=2カウント。"""
+        assert publisher.weighted_length("あいう") == 6
+
+    def test_emoji_double_weight(self, publisher: XPublisher) -> None:
+        """絵文字は1文字=2カウント。"""
+        assert publisher.weighted_length("🔥") == 2
+
+    def test_url_fixed_23(self, publisher: XPublisher) -> None:
+        """URLはt.co短縮で23文字固定。"""
+        assert publisher.weighted_length("https://example.com/long/path") == 23
+
+    def test_mixed_text(self, publisher: XPublisher) -> None:
+        """混合テキストの加重文字数計算。"""
+        # "Hi " (3) + "あ" (2) + " " (1) + URL (23) = 29
+        assert publisher.weighted_length("Hi あ https://example.com") == 29
+
+
 class TestValidateText:
-    """文字数バリデーションのテスト。"""
+    """文字数バリデーションのテスト（加重文字数）。"""
 
     def test_valid_text(self, publisher: XPublisher) -> None:
-        """280文字以内のテキストはエラーなし。"""
+        """280加重文字以内のテキストはエラーなし。"""
         publisher.validate_text("Hello World")
 
-    def test_exact_280_chars(self, publisher: XPublisher) -> None:
-        """ちょうど280文字のテキストはエラーなし。"""
+    def test_exact_280_ascii(self, publisher: XPublisher) -> None:
+        """ASCII 280文字（加重280）はエラーなし。"""
         publisher.validate_text("a" * MAX_TWEET_LENGTH)
 
-    def test_281_chars_raises(self, publisher: XPublisher) -> None:
-        """281文字のテキストでValueErrorが発生する。"""
+    def test_281_ascii_raises(self, publisher: XPublisher) -> None:
+        """ASCII 281文字（加重281）でValueErrorが発生する。"""
         with pytest.raises(ValueError, match="1文字超過"):
             publisher.validate_text("a" * (MAX_TWEET_LENGTH + 1))
 
@@ -89,9 +114,19 @@ class TestValidateText:
         with pytest.raises(ValueError, match="空です"):
             publisher.validate_text("")
 
-    def test_japanese_280_chars(self, publisher: XPublisher) -> None:
-        """日本語280文字のテキストはエラーなし。"""
-        publisher.validate_text("あ" * MAX_TWEET_LENGTH)
+    def test_japanese_140_chars_ok(self, publisher: XPublisher) -> None:
+        """日本語140文字（加重280）はエラーなし。"""
+        publisher.validate_text("あ" * 140)
+
+    def test_japanese_141_chars_raises(self, publisher: XPublisher) -> None:
+        """日本語141文字（加重282）でValueErrorが発生する。"""
+        with pytest.raises(ValueError, match="2文字超過"):
+            publisher.validate_text("あ" * 141)
+
+    def test_japanese_280_chars_raises(self, publisher: XPublisher) -> None:
+        """日本語280文字（加重560）でValueErrorが発生する。"""
+        with pytest.raises(ValueError, match="超過"):
+            publisher.validate_text("あ" * MAX_TWEET_LENGTH)
 
 
 class TestPublish:
@@ -180,10 +215,19 @@ class TestPublish:
 
         assert respx.calls.call_count == 2  # 初回 + リトライ1回
 
-    async def test_publish_text_too_long(self, publisher: XPublisher, blog_post: BlogPost) -> None:
-        """文字数超過時にValueErrorが発生する。"""
+    async def test_publish_text_too_long_ascii(
+        self, publisher: XPublisher, blog_post: BlogPost
+    ) -> None:
+        """ASCII文字数超過時にValueErrorが発生する。"""
         with pytest.raises(ValueError, match="超過"):
             await publisher.publish(blog_post, text="a" * 281)
+
+    async def test_publish_text_too_long_japanese(
+        self, publisher: XPublisher, blog_post: BlogPost
+    ) -> None:
+        """日本語で加重文字数超過時にValueErrorが発生する。"""
+        with pytest.raises(ValueError, match="超過"):
+            await publisher.publish(blog_post, text="あ" * 141)
 
 
 class TestPublishThread:
@@ -231,12 +275,12 @@ class TestPublishThread:
         assert mock_post.call_args_list[2] == mocker.call("3件目", reply_to="t2")
 
     def test_thread_text_validation(self, publisher: XPublisher, blog_post: BlogPost) -> None:
-        """スレッド内の文字数超過でValueErrorが発生する。"""
+        """スレッド内の加重文字数超過でValueErrorが発生する。"""
         with pytest.raises(ValueError, match="超過"):
             import asyncio
 
             asyncio.get_event_loop().run_until_complete(
-                publisher.publish_thread(blog_post, ["OK", "a" * 281])
+                publisher.publish_thread(blog_post, ["OK", "あ" * 141])
             )
 
     @respx.mock

@@ -142,10 +142,10 @@ class TestWordPressPublisher:
         result = await publisher.publish(blog_post, categories=["AI"], tags=["python"])
         assert result.success is True
 
-    async def test_publish_with_subtitle_includes_meta(
+    async def test_publish_with_subtitle_includes_excerpt(
         self, publisher: WordPressPublisher, respx_mock: object
     ) -> None:
-        """subtitle付き投稿でpayloadにmeta.subtitleが含まれる。"""
+        """subtitle付き投稿でexcerptが設定され、続きを読むリンク付きで更新される。"""
         import respx as respx_lib
 
         post = BlogPost(
@@ -157,26 +157,33 @@ class TestWordPressPublisher:
             created_at=datetime(2026, 2, 13, tzinfo=UTC),
         )
 
-        route = respx_lib.post("https://example.com/wp-json/wp/v2/posts").mock(
+        create_route = respx_lib.post("https://example.com/wp-json/wp/v2/posts").mock(
             return_value=httpx.Response(
                 201,
                 json={"id": 50, "link": "https://example.com/blog/subtitle-test"},
             )
         )
+        update_route = respx_lib.post(
+            "https://example.com/wp-json/wp/v2/posts/50"
+        ).mock(return_value=httpx.Response(200, json={"id": 50}))
 
         result = await publisher.publish(post, status="draft")
         assert result.success is True
 
-        request_json = route.calls[0].request.content
         import json
 
-        payload = json.loads(request_json)
-        assert payload["meta"] == {"subtitle": "補足サブタイトル"}
+        create_payload = json.loads(create_route.calls[0].request.content)
+        assert create_payload["excerpt"] == "補足サブタイトル"
 
-    async def test_publish_without_subtitle_excludes_meta(
+        update_payload = json.loads(update_route.calls[0].request.content)
+        assert "補足サブタイトル" in update_payload["excerpt"]
+        assert "続きを読む" in update_payload["excerpt"]
+        assert "more-link" in update_payload["excerpt"]
+
+    async def test_publish_without_subtitle_excludes_excerpt(
         self, publisher: WordPressPublisher, blog_post: BlogPost, respx_mock: object
     ) -> None:
-        """subtitleなし投稿でpayloadにmetaが含まれない。"""
+        """subtitleなし投稿でpayloadにexcerptが含まれない。"""
         import respx as respx_lib
 
         route = respx_lib.post("https://example.com/wp-json/wp/v2/posts").mock(
@@ -192,7 +199,7 @@ class TestWordPressPublisher:
         import json
 
         payload = json.loads(route.calls[0].request.content)
-        assert "meta" not in payload
+        assert "excerpt" not in payload
 
     async def test_publish_auth_error(
         self, publisher: WordPressPublisher, blog_post: BlogPost, respx_mock: object
