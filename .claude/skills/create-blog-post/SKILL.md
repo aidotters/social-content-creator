@@ -168,30 +168,32 @@ status: confirmed
 
 3. **タイプに応じた情報収集**を行う
    - `weekly-ai-news`:
-     1. Notion API経由でGoogle Alertニュース取得（過去7日間）
+     1. **対象期間の算出**: 記事作成日（今日の日付）を基準に、対象週の月曜日〜日曜日を算出する。例: 記事作成日が2026-02-21（金）なら、対象週は2026-02-15（月）〜2026-02-21（日）→ `date_from=2026-02-15`, `date_to=2026-02-22`（before条件のため翌日）
+     2. Notion API経由でGoogle Alertニュース取得（`date_from`/`date_to`で明示的に期間指定）
         ```bash
         uv run python -c "
         import asyncio, json
         from src.collectors.notion_news import NotionNewsCollector
         c = NotionNewsCollector()
-        results = asyncio.run(c.collect('', days=7))
+        results = asyncio.run(c.collect('', date_from='${DATE_FROM}', date_to='${DATE_TO}'))
         for r in results:
-            print(json.dumps({'title': r.title, 'url': r.url, 'content': r.content[:200]}, ensure_ascii=False))
+            print(json.dumps({'title': r.title, 'url': r.url, 'published_date': r.published_date, 'content': r.content[:200]}, ensure_ascii=False))
         "
         ```
-     2. Notion API経由でMedium Daily Digest取得（過去7日間）
+     3. Notion API経由でMedium Daily Digest取得（`date_from`/`date_to`で明示的に期間指定）
         ```bash
         uv run python -c "
         import asyncio, json
         from src.collectors.notion_medium import NotionMediumCollector
         c = NotionMediumCollector()
-        results = asyncio.run(c.collect('', days=7))
+        results = asyncio.run(c.collect('', date_from='${DATE_FROM}', date_to='${DATE_TO}'))
         for r in results:
-            print(json.dumps({'title': r.title, 'url': r.url, 'content': r.content[:200]}, ensure_ascii=False))
+            print(json.dumps({'title': r.title, 'url': r.url, 'published_date': r.published_date, 'content': r.content[:200]}, ensure_ascii=False))
         "
         ```
-     3. WebSearchで最新AIニュースを検索
-     4. **ソース選定基準**（情報の信頼性を担保するため、以下を厳守する）:
+     4. WebSearchで最新AIニュースを検索
+     5. **日付バリデーション**: 収集したニュースの `published_date` を確認し、対象期間外（`date_from` 〜 記事作成日）のニュースは記事に含めないこと。対象期間外のニュースが混入していた場合は必ず除外する
+     6. **ソース選定基準**（情報の信頼性を担保するため、以下を厳守する）:
         - **一次情報を優先**: 当事者（企業・研究機関・開発者本人）による公式発表・プレスリリース・公式ブログを最優先で採用する
         - **信頼できるメディアのみ許可**: 大手ニュースメディア（日経、WSJ等）、専門テックメディア（Impress、TechCrunch、The Verge等）、学術機関の発表に限定する
         - **個人ブログは不可**: 個人が運営するブログ・個人サイトの記事はソースとして使用しない。ニュースの存在を知るきっかけが個人ブログであっても、必ず原典（公式発表や信頼できるメディアの報道）を探してそちらを参考リンクとする

@@ -54,6 +54,7 @@ class CollectedData(BaseModel):
     url: str | None = None
     content: str
     collected_at: datetime
+    published_date: str | None = None
 
 
 class PublishResult(BaseModel):

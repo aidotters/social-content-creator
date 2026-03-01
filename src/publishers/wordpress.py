@@ -8,8 +8,19 @@ import httpx
 from dotenv import load_dotenv
 
 from src.errors import WordPressPublishError
-from src.models.blog_post import BlogPost, PublishResult
+from src.models.blog_post import BlogPost, ContentType, PublishResult
 from src.utils.markdown import markdown_to_html
+
+_CONTENT_TYPE_PREFIXES: dict[ContentType, str] = {
+    "paper-review": "【論文解説】",
+    "weekly-ai-news": "【週刊AIニュース】",
+    "project-intro": "【プロジェクト紹介】",
+    "tool-tips": "【ツール紹介】",
+    "market-analysis": "【市場分析】",
+    "ml-practice": "【ML実践】",
+    "cv": "【CV論文解説】",
+    "feature": "【特集】",
+}
 
 
 class WordPressPublisher:
@@ -78,8 +89,24 @@ class WordPressPublisher:
 
                 html_content = markdown_to_html(post.content)
 
+                # サブタイトルをコンテンツ先頭に挿入
+                if post.subtitle:
+                    subtitle_html = (
+                        f'<p class="article-subtitle" style="'
+                        f"font-size:1.05em;color:#666;"
+                        f'margin-bottom:1.5em;">'
+                        f"<em>{post.subtitle}</em></p>\n"
+                    )
+                    html_content = subtitle_html + html_content
+
+                # content_typeに応じてタイトルにプレフィックスを付与
+                prefix = _CONTENT_TYPE_PREFIXES.get(post.content_type, "")
+                title = post.title
+                if prefix and not title.startswith(prefix):
+                    title = prefix + title
+
                 payload: dict[str, object] = {
-                    "title": post.title,
+                    "title": title,
                     "content": html_content,
                     "status": status,
                     "slug": post.slug,

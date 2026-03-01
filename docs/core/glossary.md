@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-17
+> 最終更新: 2026-02-21
 
 # プロジェクト用語集 (Glossary)
 
@@ -7,7 +7,7 @@
 
 このドキュメントは、Social Content Creator プロジェクト内で使用される用語の定義を管理します。
 
-**更新日**: 2026-02-17
+**更新日**: 2026-02-21
 
 ## ドメイン用語
 
@@ -71,7 +71,7 @@
 
 **定義**: Notionに構築された、Google Alertで収集したAI関連ニュース記事の保存データベース
 
-**説明**: Google Alertが配信するニュース記事をNotionに蓄積したもの。`NotionNewsCollector` が過去1週間の記事を取得し、週刊AIニュース等の記事生成ソースとして活用する。
+**説明**: Google Alertが配信するニュース記事をNotionに蓄積したもの。`NotionNewsCollector` が日付範囲指定（`date_from`/`date_to`）またはデフォルト過去7日間で記事を取得し、週刊AIニュース等の記事生成ソースとして活用する。取得時に `created_time` を `published_date` として付与する。
 
 **関連用語**: Notion API、NotionNewsCollector、コンテンツタイプ（weekly-ai-news）
 
@@ -91,7 +91,7 @@
 
 **定義**: Notionに構築された、Medium Daily Digestから収集した技術記事の保存データベース
 
-**説明**: Medium Daily Digestで配信される技術記事をNotionに蓄積したもの。`NotionMediumCollector` が過去1週間の記事を取得し、ニュースハイライト等の記事生成ソースとして活用する。
+**説明**: Medium Daily Digestで配信される技術記事をNotionに蓄積したもの。`NotionMediumCollector` が日付範囲指定（`date_from`/`date_to`）またはデフォルト過去7日間で記事を取得し、ニュースハイライト等の記事生成ソースとして活用する。取得時に `Date` プロパティを `published_date` として付与する。
 
 **関連用語**: Notion API、NotionMediumCollector
 
@@ -328,6 +328,7 @@ stateDiagram-v2
 
 **主要フィールド**:
 - `title`: 記事タイトル
+- `subtitle`: サブタイトル（補足情報）
 - `content`: 記事本文（Markdown）
 - `content_type`: コンテンツタイプ
 - `status`: 記事ステータス
@@ -360,6 +361,7 @@ stateDiagram-v2
 - `title`: タイトル
 - `content`: 内容
 - `url`: URL
+- `published_date`: ニュース発生日（YYYY-MM-DD形式、Notionコレクター用）
 
 **関連エンティティ**: BlogPost
 

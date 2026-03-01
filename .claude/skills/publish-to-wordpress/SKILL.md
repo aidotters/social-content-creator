@@ -50,6 +50,8 @@ description: ドラフト記事をWordPressに投稿するスキル。docs/draft
 ### ステップ3: WordPress投稿
 
 ```bash
+# categories にはカテゴリ名（str）のリストを渡す（IDではなく名前）
+# 例: categories=['AIニュース', 'AI技術']
 uv run python -c "
 import asyncio
 from pathlib import Path

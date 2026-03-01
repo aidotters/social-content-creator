@@ -1,6 +1,7 @@
 """X（Twitter）投稿Publisher。"""
 
 import asyncio
+import logging
 import os
 import typing
 
@@ -13,6 +14,8 @@ from dotenv import load_dotenv
 
 from src.errors import XPublishError
 from src.models.blog_post import BlogPost, PublishResult, XPublishResult
+
+logger = logging.getLogger(__name__)
 
 X_API_BASE = "https://api.x.com/2"
 MAX_TWEET_LENGTH = 280
@@ -155,6 +158,12 @@ class XPublisher:
                         auth=self._auth,
                     )
 
+                logger.info(
+                    "X API response: status=%d, body=%s",
+                    response.status_code,
+                    response.text,
+                )
+
                 if response.status_code in (401, 403):
                     raise XPublishError(
                         message=(
@@ -162,6 +171,7 @@ class XPublisher:
                             "X_API_KEY, X_API_SECRET, "
                             "X_ACCESS_TOKEN, X_ACCESS_TOKEN_SECRET"
                             "を確認してください。"
+                            f" (response: {response.text})"
                         ),
                         status_code=response.status_code,
                     )

@@ -175,3 +175,51 @@ class TestNotionMediumCollector:
         results = await collector.collect("")
 
         assert results[0].url == "https://medium.com/test-article"
+
+    @respx.mock
+    async def test_date_from_to_filter(self) -> None:
+        """date_from/date_toがAPIリクエストのフィルタに反映される。"""
+        respx.post(NOTION_DB_QUERY_URL).mock(
+            return_value=Response(200, json=_make_query_response([]))
+        )
+
+        collector = NotionMediumCollector(token="secret_test", medium_db_id="test-medium-db-id")
+        await collector.collect("", date_from="2026-02-15", date_to="2026-02-22")
+
+        request = respx.calls[0].request
+        import json
+        body = json.loads(request.content)
+        and_filters = body["filter"]["and"]
+        assert len(and_filters) == 2
+        assert and_filters[0]["date"]["on_or_after"] == "2026-02-15"
+        assert and_filters[1]["date"]["before"] == "2026-02-22"
+
+    @respx.mock
+    async def test_date_from_only(self) -> None:
+        """date_fromのみ指定時、beforeは設定されない。"""
+        respx.post(NOTION_DB_QUERY_URL).mock(
+            return_value=Response(200, json=_make_query_response([]))
+        )
+
+        collector = NotionMediumCollector(token="secret_test", medium_db_id="test-medium-db-id")
+        await collector.collect("", date_from="2026-02-15")
+
+        request = respx.calls[0].request
+        import json
+        body = json.loads(request.content)
+        date_filter = body["filter"]["date"]
+        assert date_filter["on_or_after"] == "2026-02-15"
+        assert "before" not in date_filter
+
+    @respx.mock
+    async def test_published_date_extracted(self) -> None:
+        """published_dateがDateプロパティから設定される。"""
+        pages = [_make_page()]
+        respx.post(NOTION_DB_QUERY_URL).mock(
+            return_value=Response(200, json=_make_query_response(pages))
+        )
+
+        collector = NotionMediumCollector(token="secret_test", medium_db_id="test-medium-db-id")
+        results = await collector.collect("")
+
+        assert results[0].published_date == "2026-02-15"

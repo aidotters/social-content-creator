@@ -37,19 +37,38 @@ class NotionNewsCollector(NotionBaseCollector):
             query: フィルタキーワード（空文字で全件）
             **kwargs:
                 days: 過去何日間のデータを対象にするか（デフォルト: 7）
+                date_from: 開始日（YYYY-MM-DD文字列、指定時はdaysより優先）
+                date_to: 終了日（YYYY-MM-DD文字列、指定時はdaysより優先）
 
         Returns:
             変換されたCollectedDataのリスト
         """
-        days_val = kwargs.get("days", 7)
-        days = int(days_val) if isinstance(days_val, (int, str)) else 7
-        cutoff = datetime.now(UTC) - timedelta(days=days)
-        cutoff_str = cutoff.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        date_from = kwargs.get("date_from")
+        date_to = kwargs.get("date_to")
 
-        filter_obj: dict[str, Any] = {
-            "timestamp": "created_time",
-            "created_time": {"on_or_after": cutoff_str},
+        if isinstance(date_from, str) and date_from:
+            on_or_after = date_from
+        else:
+            days_val = kwargs.get("days", 7)
+            days = int(days_val) if isinstance(days_val, (int, str)) else 7
+            cutoff = datetime.now(UTC) - timedelta(days=days)
+            on_or_after = cutoff.strftime("%Y-%m-%d")
+
+        on_or_after_filter: dict[str, Any] = {
+            "property": "Date",
+            "date": {"on_or_after": on_or_after},
         }
+
+        if isinstance(date_to, str) and date_to:
+            before_filter: dict[str, Any] = {
+                "property": "Date",
+                "date": {"before": date_to},
+            }
+            filter_obj: dict[str, Any] = {
+                "and": [on_or_after_filter, before_filter],
+            }
+        else:
+            filter_obj = on_or_after_filter
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -57,7 +76,7 @@ class NotionNewsCollector(NotionBaseCollector):
                     client,
                     self._db_id,
                     filter_obj=filter_obj,
-                    sorts=[{"timestamp": "created_time", "direction": "descending"}],
+                    sorts=[{"property": "Date", "direction": "descending"}],
                 )
         except CollectionError:
             raise
@@ -75,6 +94,7 @@ class NotionNewsCollector(NotionBaseCollector):
             source = self._extract_rich_text(props, "Source")
             tags = self._extract_multi_select(props, "Tags")
             url = self._extract_url(props, "URL")
+            published_date = self._extract_date(props, "Date") or None
 
             display_title = title or original_title or "Untitled"
 
@@ -98,6 +118,7 @@ class NotionNewsCollector(NotionBaseCollector):
                     url=url or None,
                     content="\n".join(content_parts),
                     collected_at=datetime.now(UTC),
+                    published_date=published_date,
                 )
             )
         return collected

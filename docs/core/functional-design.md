@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-18
+> 最終更新: 2026-02-21
 
 # 機能設計書 (Functional Design Document)
 
@@ -82,6 +82,7 @@ type PostStatus = Literal["draft", "review", "ready", "published"]
 class BlogPost(BaseModel):
     """ブログ記事のデータモデル"""
     title: str                              # 記事タイトル
+    subtitle: str | None = None             # サブタイトル（補足情報）
     content: str                            # 記事本文（Markdown）
     content_type: ContentType               # コンテンツタイプ
     status: PostStatus = "draft"            # 記事ステータス
@@ -135,6 +136,7 @@ class CollectedData(BaseModel):
     url: str | None = None                  # URL
     content: str                            # 内容
     collected_at: datetime                  # 収集日時
+    published_date: str | None = None       # ニュース発生日（YYYY-MM-DD形式、Notionコレクター用）
 ```
 
 ### エンティティ: PublishResult
@@ -336,9 +338,9 @@ class CollectorProtocol(Protocol):
 - `WebSearchCollector`: Web検索による情報収集
 - `URLFetcherCollector`: 指定URLの内容取得・要約
 - `GeminiCollector`: Gemini CLI経由の調査レポート生成
-- `NotionNewsCollector`: Notion API経由でGoogle Alertニュース記事を取得（過去1週間）
+- `NotionNewsCollector`: Notion API経由でGoogle Alertニュース記事を取得（`date_from`/`date_to` で日付範囲指定可、デフォルト: 過去7日間）
 - `NotionPaperCollector`: Notion API経由でArxiv論文データを取得（テーマ指定/過去1週間）
-- `NotionMediumCollector`: Notion API経由でMedium Daily Digest記事を取得（過去1週間）
+- `NotionMediumCollector`: Notion API経由でMedium Daily Digest記事を取得（`date_from`/`date_to` で日付範囲指定可、デフォルト: 過去7日間）
 - `GitHubCollector`: GitHub API経由のリポジトリ情報取得
 
 **共通基底クラス**: `NotionBaseCollector`（`notion_base.py`）
