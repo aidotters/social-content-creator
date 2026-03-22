@@ -159,7 +159,7 @@ result = asyncio.run(pub.publish(post, text='''${TWEET_TEXT}'''))
 # result = asyncio.run(pub.publish_thread(post, texts))
 
 if result.success:
-    print(f'投稿成功: {result.tweet_url}')
+    print(f'投稿成功: {result.url}')
 else:
     print(f'投稿失敗: {result.error_message}')
 "
