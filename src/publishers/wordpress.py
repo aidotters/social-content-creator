@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from src.errors import WordPressPublishError
 from src.models.blog_post import BlogPost, ContentType, PublishResult
-from src.utils.markdown import markdown_to_html
+from src.utils.markdown import html_to_gutenberg_blocks, markdown_to_html
 
 _CONTENT_TYPE_PREFIXES: dict[ContentType, str] = {
     "paper-review": "【論文解説】",
@@ -88,16 +88,19 @@ class WordPressPublisher:
                 tag_ids = await self._resolve_tags(client, tags or [])
 
                 html_content = markdown_to_html(post.content)
+                html_content = html_to_gutenberg_blocks(html_content)
 
                 # サブタイトルをコンテンツ先頭に挿入
                 if post.subtitle:
-                    subtitle_html = (
+                    subtitle_block = (
+                        "<!-- wp:paragraph -->\n"
                         f'<p class="article-subtitle" style="'
                         f"font-size:1.05em;color:#666;"
                         f'margin-bottom:1.5em;">'
                         f"<em>{post.subtitle}</em></p>\n"
+                        "<!-- /wp:paragraph -->"
                     )
-                    html_content = subtitle_html + html_content
+                    html_content = subtitle_block + "\n\n" + html_content
 
                 # content_typeに応じてタイトルにプレフィックスを付与
                 prefix = _CONTENT_TYPE_PREFIXES.get(post.content_type, "")
@@ -147,6 +150,11 @@ class WordPressPublisher:
 
                 post_id = data.get("id")
                 post_url = data.get("link", "")
+
+                # 下書き投稿時はlinkが?p=形式になるため、slugからパーマリンクを構築
+                if post_url and "?p=" in post_url:
+                    post_slug = data.get("slug", post.slug)
+                    post_url = f"{self._base_url}/{post_slug}/"
 
                 if post.subtitle and post_id and post_url:
                     excerpt_with_more = (

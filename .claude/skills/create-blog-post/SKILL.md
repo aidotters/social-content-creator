@@ -297,8 +297,10 @@ status: confirmed
    ```bash
    python -c "
    import asyncio
+   from pathlib import Path
    from src.publishers.wordpress import WordPressPublisher
    from src.generators.blog_post import BlogPostGenerator
+   from src.utils.markdown import read_frontmatter_markdown, write_frontmatter_markdown
    pub = WordPressPublisher()
    gen = BlogPostGenerator()
    post = asyncio.run(gen.load_draft(Path('${DRAFT_PATH}')))
@@ -306,6 +308,10 @@ status: confirmed
    if result.success:
        print(f'投稿成功: {result.url}')
        dest = asyncio.run(gen.move_to_published(post, Path('${DRAFT_PATH}')))
+       # 移動先ファイルのfrontmatterにwordpress_urlを追記
+       metadata, content = read_frontmatter_markdown(dest)
+       metadata['wordpress_url'] = result.url
+       write_frontmatter_markdown(dest, metadata, content)
        print(f'移動先: {dest}')
    else:
        print(f'投稿失敗: {result.error_message}')

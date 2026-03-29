@@ -72,6 +72,127 @@ def markdown_to_html(text: str) -> str:
     return md.markdown(text, extensions=["extra", "nl2br", "sane_lists"])  # type: ignore[no-any-return]
 
 
+def html_to_gutenberg_blocks(html: str) -> str:
+    """HTMLをWordPress Gutenbergブロック形式に変換する。
+
+    素のHTMLをGutenbergのブロックコメントで囲み、
+    WordPressエディタで個別ブロックとして編集可能にする。
+
+    Args:
+        html: 変換対象のHTML文字列
+
+    Returns:
+        Gutenbergブロック形式のHTML文字列
+    """
+    blocks: list[str] = []
+    remaining = html.strip()
+
+    _BLOCK_TAGS = r"h[1-6]|p|pre|ul|ol|table|blockquote|div|figure"
+
+    while remaining:
+        remaining = remaining.lstrip()
+        if not remaining:
+            break
+
+        # <hr> / <hr/>
+        m = re.match(r"<hr\s*/?>", remaining)
+        if m:
+            blocks.append(
+                "<!-- wp:separator -->\n"
+                '<hr class="wp-block-separator has-alpha-channel-opacity"/>\n'
+                "<!-- /wp:separator -->"
+            )
+            remaining = remaining[m.end() :]
+            continue
+
+        # Block-level opening tag
+        m = re.match(rf"<({_BLOCK_TAGS})(\s[^>]*)?>", remaining)
+        if m:
+            tag = m.group(1)
+            attrs = m.group(2) or ""
+            close_pos = _find_close_tag(remaining, tag, m.end())
+            element = remaining[:close_pos]
+            remaining = remaining[close_pos:]
+            blocks.append(_to_gutenberg_block(tag, element, attrs))
+            continue
+
+        # Unrecognized content — collect until next block element or end
+        next_match = re.search(
+            rf"<(?:{_BLOCK_TAGS}|hr)[\s>/]", remaining[1:]
+        )
+        if next_match:
+            end = 1 + next_match.start()
+            fragment = remaining[:end].strip()
+            remaining = remaining[end:]
+        else:
+            fragment = remaining.strip()
+            remaining = ""
+
+        if fragment:
+            blocks.append(f"<!-- wp:html -->\n{fragment}\n<!-- /wp:html -->")
+
+    return "\n\n".join(blocks)
+
+
+def _find_close_tag(html: str, tag: str, start: int) -> int:
+    """ネストを考慮して対応する閉じタグの終了位置を返す。"""
+    depth = 1
+    pos = start
+    open_re = re.compile(rf"<{tag}[\s>]")
+    close_re = re.compile(rf"</{tag}>")
+
+    while depth > 0 and pos < len(html):
+        next_open = open_re.search(html, pos)
+        next_close = close_re.search(html, pos)
+
+        if next_close is None:
+            return len(html)
+
+        if next_open and next_open.start() < next_close.start():
+            depth += 1
+            pos = next_open.end()
+        else:
+            depth -= 1
+            pos = next_close.end()
+
+    return pos
+
+
+def _to_gutenberg_block(tag: str, element: str, attrs: str) -> str:
+    """単一のHTML要素をGutenbergブロックに変換する。"""
+    if re.match(r"h[1-6]$", tag):
+        level = int(tag[1])
+        if level == 2:
+            header = "<!-- wp:heading -->"
+        else:
+            header = f'<!-- wp:heading {{"level":{level}}} -->'
+        return f"{header}\n{element}\n<!-- /wp:heading -->"
+
+    if tag == "p":
+        return f"<!-- wp:paragraph -->\n{element}\n<!-- /wp:paragraph -->"
+
+    if tag == "pre":
+        return f"<!-- wp:code -->\n{element}\n<!-- /wp:code -->"
+
+    if tag == "ul":
+        return f"<!-- wp:list -->\n{element}\n<!-- /wp:list -->"
+
+    if tag == "ol":
+        return f'<!-- wp:list {{"ordered":true}} -->\n{element}\n<!-- /wp:list -->'
+
+    if tag == "table":
+        return (
+            "<!-- wp:table -->\n"
+            f"<figure class=\"wp-block-table\">{element}</figure>\n"
+            "<!-- /wp:table -->"
+        )
+
+    if tag == "blockquote":
+        return f"<!-- wp:quote -->\n{element}\n<!-- /wp:quote -->"
+
+    return f"<!-- wp:html -->\n{element}\n<!-- /wp:html -->"
+
+
 def count_characters(text: str) -> int:
     """Markdownテキストの文字数をカウントする。
 

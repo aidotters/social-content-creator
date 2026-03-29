@@ -87,6 +87,29 @@ class TestWordPressPublisher:
         assert result.post_id == 42
         assert result.url == "https://example.com/blog/test-post"
 
+    async def test_publish_draft_resolves_permalink_from_slug(
+        self, publisher: WordPressPublisher, blog_post: BlogPost, respx_mock: object
+    ) -> None:
+        """下書き投稿時に?p=形式のlinkがスラッグベースのパーマリンクに変換される。"""
+        import respx as respx_lib
+
+        respx_lib.post("https://example.com/wp-json/wp/v2/posts").mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "id": 45,
+                    "link": "https://example.com/?p=45",
+                    "slug": "my-draft-post",
+                },
+            )
+        )
+
+        result = await publisher.publish(blog_post, status="draft")
+
+        assert result.success is True
+        assert result.post_id == 45
+        assert result.url == "https://example.com/my-draft-post/"
+
     async def test_publish_with_publish_status(
         self, publisher: WordPressPublisher, blog_post: BlogPost, respx_mock: object
     ) -> None:
