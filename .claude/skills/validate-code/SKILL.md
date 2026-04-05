@@ -1,4 +1,5 @@
 ---
+name: validate-code
 description: コード品質・設計整合性検証
 ---
 

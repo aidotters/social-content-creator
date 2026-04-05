@@ -1,4 +1,5 @@
 ---
+name: review-docs
 description: ドキュメント品質レビュー
 ---
 

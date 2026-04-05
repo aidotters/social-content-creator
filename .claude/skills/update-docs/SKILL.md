@@ -1,4 +1,5 @@
 ---
+name: update-docs
 description: 実装済みコードに基づきdocs/core/、CLAUDE.md、README.mdを同期
 ---
 

@@ -1,4 +1,5 @@
 ---
+name: brainstorm
 description: アイデア壁打ち → docs/ideas/に保存
 ---
 

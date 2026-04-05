@@ -1,4 +1,5 @@
 ---
+name: initial-setup
 description: プロジェクト初期セットアップ（新規/既存対応）
 ---
 

@@ -1,4 +1,5 @@
 ---
+name: implement-feature
 description: 計画に基づいて機能を実装（plan-feature完了後に実行）。レポートからの自動タスク抽出にも対応。
 ---
 

@@ -1,4 +1,5 @@
 ---
+name: plan-feature
 description: 機能の計画ドキュメントを作成し、品質レビュー後にユーザー確認で停止
 ---
 

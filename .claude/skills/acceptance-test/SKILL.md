@@ -1,4 +1,5 @@
 ---
+name: acceptance-test
 description: 受け入れ条件の検証
 ---
 
