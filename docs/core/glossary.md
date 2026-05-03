@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-21
+> 最終更新: 2026-04-28
 
 # プロジェクト用語集 (Glossary)
 
@@ -7,7 +7,7 @@
 
 このドキュメントは、Social Content Creator プロジェクト内で使用される用語の定義を管理します。
 
-**更新日**: 2026-02-21
+**更新日**: 2026-04-26
 
 ## ドメイン用語
 
@@ -183,6 +183,16 @@
 
 **バージョン**: 0.27+
 
+### Gemini 2.5 Flash Image (Nanobanana)
+
+**定義**: Google のマルチモーダル生成モデル。テキストプロンプトから画像を生成する API。
+
+**本プロジェクトでの用途**: ブログ記事のアイキャッチ画像生成。`GeminiImageGenerator`（`src/generators/image.py`）で `gemini-2.5-flash-image` モデルを呼び出し、`outputs/images/` に保存する。`/generate-image` スキルおよび `/publish-to-wordpress --auto-generate-image` から利用される。
+
+**バージョン**: モデル ID `gemini-2.5-flash-image`
+
+**関連用語**: GeminiImageGenerator、build_featured_image_prompt、ImageGenerationError
+
 ### Gemini CLI
 
 **定義**: Google の Gemini AI モデルをコマンドラインから利用するツール
@@ -241,7 +251,7 @@
 
 **意味**: AIモデルが外部サービスと連携するためのプロトコル
 
-**本プロジェクトでの使用**: 各種MCP連携（Playwright MCP等）。Notion連携は直接API呼び出しに移行済み
+**本プロジェクトでの使用**: 各種MCP連携（Playwright MCP等）。Notion連携は直接API呼び出しに移行済み（詳細は「Notion API（直接呼び出し）」を参照）
 
 ### MVP
 
@@ -346,6 +356,8 @@ stateDiagram-v2
 
 **主要フィールド**:
 - `content_type`: コンテンツタイプ
+- `name`: テンプレート名
+- `description`: テンプレートの説明
 - `min_words` / `max_words`: 文字数目安
 - `sections`: セクション構成（`list[TemplateSection]`）
 - `style_guide`: 文体ガイド
@@ -439,3 +451,11 @@ stateDiagram-v2
 **発生条件**: 指定されたコンテンツタイプに対応するテンプレートが存在しない場合
 
 **対処方法**: 有効なコンテンツタイプを指定するか、デフォルトテンプレートを使用。
+
+### ImageGenerationError
+
+**クラス名**: `ImageGenerationError`
+
+**発生条件**: `GeminiImageGenerator` での画像生成が失敗した場合（`GEMINI_API_KEY` 未設定、空プロンプト、Gemini API 呼び出し失敗、セーフティ拒否等で画像が返らない場合）
+
+**対処方法**: `.env` の `GEMINI_API_KEY` を確認。プロンプトを調整してセーフティを回避するか、別の表現に書き換える。

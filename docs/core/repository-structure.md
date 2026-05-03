@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-18
+> 最終更新: 2026-04-28
 
 # リポジトリ構造定義書 (Repository Structure Document)
 
@@ -8,18 +8,19 @@
 ```
 social-content-creator/
 ├── .claude/
-│   ├── commands/               # スラッシュコマンド
-│   ├── skills/                 # タスクモード別スキル
+│   ├── skills/                 # タスクモード別スキル（スラッシュコマンドはスキルとして実装）
 │   │   ├── create-blog-post/   # ブログ記事生成スキル
 │   │   ├── publish-to-x/       # X（Twitter）投稿スキル
 │   │   ├── publish-to-wordpress/ # WordPress投稿スキル
 │   │   ├── wordpress-setup/    # WordPressセットアップスキル（Playwright MCP使用）
+│   │   ├── generate-image/     # Gemini 2.5 Flash Image（Nanobanana）画像生成スキル
 │   │   └── ...                 # 汎用スキル（steering, validation, prd-writing等）
 │   └── settings.json           # Claude Code設定
 ├── src/
-│   ├── generators/             # 記事生成ロジック
+│   ├── generators/             # 記事・画像生成ロジック
 │   │   ├── __init__.py
-│   │   └── blog_post.py
+│   │   ├── blog_post.py
+│   │   └── image.py            # GeminiImageGenerator（Gemini 2.5 Flash Image）
 │   ├── collectors/             # 情報収集ツール群
 │   │   ├── __init__.py
 │   │   ├── base.py             # CollectorProtocol定義
@@ -52,13 +53,15 @@ social-content-creator/
 │   │   └── template.py
 │   ├── utils/                  # 共通ユーティリティ
 │   │   ├── __init__.py
-│   │   └── markdown.py
+│   │   ├── markdown.py
+│   │   └── image_prompt.py
 │   └── errors.py               # カスタムエラークラス
 ├── tests/
 │   ├── conftest.py             # テストフィクスチャ
 │   ├── unit/
 │   │   ├── generators/
-│   │   │   └── test_blog_post.py
+│   │   │   ├── test_blog_post.py
+│   │   │   └── test_image.py
 │   │   ├── models/
 │   │   │   ├── test_blog_post.py
 │   │   │   └── test_template.py
@@ -75,7 +78,8 @@ social-content-creator/
 │   │   │   ├── test_wordpress.py
 │   │   │   └── test_x.py
 │   │   ├── utils/
-│   │   │   └── test_markdown.py
+│   │   │   ├── test_markdown.py
+│   │   │   └── test_image_prompt.py
 │   │   └── templates/
 │   │       └── test_templates.py
 │   └── integration/
@@ -87,7 +91,7 @@ social-content-creator/
 │   │   ├── architecture.md
 │   │   ├── repository-structure.md
 │   │   ├── development-guidelines.md
-│   │   ├── glossary.md
+│   │   └── glossary.md
 │   ├── refs/                   # 調査レポート・参考資料
 │   │   └── wordpress-theme-research-2026.md  # WordPress テーマ調査レポート
 │   ├── ideas/                  # アイデア・ブレインストーミング
@@ -106,6 +110,9 @@ social-content-creator/
 │       └── YYYY/
 │           └── MM/
 │               └── YYYYMMDD-{type}-{slug}.md
+├── outputs/                    # 生成物の出力先（gitignore対象）
+│   └── images/                 # 画像生成の保存先
+│       └── archive/            # WordPressアップロード成功後のアーカイブ
 ├── .steering/                  # 作業計画・タスク管理
 ├── .env.example                # 環境変数テンプレート
 ├── .env                        # 環境変数（.gitignore対象）
@@ -121,24 +128,26 @@ social-content-creator/
 
 #### generators/
 
-**役割**: 記事生成のビジネスロジック
+**役割**: 記事・画像生成のビジネスロジック
 
 **配置ファイル**:
 - `blog_post.py`: ブログ記事の生成エンジン
+- `image.py`: 画像生成エンジン（`GeminiImageGenerator` / Gemini 2.5 Flash Image）
 
 **命名規則**:
 - ファイル名: snake_case、生成対象を表す名詞
-- クラス名: PascalCase（例: `BlogPostGenerator`）
+- クラス名: PascalCase（例: `BlogPostGenerator`, `GeminiImageGenerator`）
 
 **依存関係**:
-- 依存可能: `templates/`, `collectors/`, `models/`
+- 依存可能: `templates/`, `collectors/`, `models/`, `utils/`
 - 依存禁止: `publishers/`（生成と投稿は分離）
 
 **例**:
 ```
 generators/
 ├── __init__.py
-└── blog_post.py        # BlogPostGenerator クラス
+├── blog_post.py        # BlogPostGenerator クラス
+└── image.py            # GeminiImageGenerator クラス
 ```
 
 #### collectors/
@@ -241,13 +250,14 @@ publishers/
 
 **配置ファイル**:
 - `markdown.py`: Markdown処理ユーティリティ
+- `image_prompt.py`: アイキャッチ画像生成プロンプト組み立て
 
 **命名規則**:
 - ファイル名: snake_case、機能を表す名詞
 
 **依存関係**:
-- 依存可能: 標準ライブラリ、サードパーティライブラリのみ
-- 依存禁止: `src/` 内の他モジュール
+- 依存可能: 標準ライブラリ、サードパーティライブラリ、`src/models/`（型定義のみ）
+- 依存禁止: `src/` 内のその他モジュール
 
 ### tests/ (テストディレクトリ)
 
@@ -255,31 +265,7 @@ publishers/
 
 **役割**: ユニットテストの配置
 
-**構造**:
-```
-tests/unit/
-├── generators/
-│   └── test_blog_post.py
-├── models/
-│   ├── test_blog_post.py
-│   └── test_template.py
-├── collectors/
-│   ├── test_web_search.py
-│   ├── test_url_fetcher.py
-│   ├── test_gemini.py
-│   ├── test_notion_base.py
-│   ├── test_notion_news.py
-│   ├── test_notion_paper.py
-│   ├── test_notion_medium.py
-│   └── test_github.py
-├── publishers/
-│   ├── test_wordpress.py
-│   └── test_x.py
-├── utils/
-│   └── test_markdown.py
-└── templates/
-    └── test_templates.py
-```
+**構造**: 上部のプロジェクト構造ツリー（`tests/unit/`）を参照。`src/` 配下のレイヤー（generators / models / collectors / publishers / utils / templates）をミラーする。
 
 **命名規則**:
 - パターン: `test_[テスト対象ファイル名].py`
@@ -310,7 +296,7 @@ tests/integration/
 
 | ファイル種別 | 配置先 | 命名規則 | 例 |
 |------------|--------|---------|-----|
-| 生成エンジン | `src/generators/` | `{target}.py` | `blog_post.py` |
+| 生成エンジン | `src/generators/` | `{target}.py` | `blog_post.py`, `image.py` |
 | 情報収集ツール | `src/collectors/` | `{source}.py` | `web_search.py` |
 | 投稿先連携 | `src/publishers/` | `{platform}.py` | `wordpress.py` |
 | テンプレート | `src/templates/` | `{content_type}.py` | `weekly_ai_news.py` |
@@ -355,14 +341,14 @@ tests/integration/
 ```
 models/          ← 最下層、依存なし
     ↑
-utils/           ← 標準ライブラリのみ
+utils/           ← 標準ライブラリ + models（型定義のみ）
     ↑
 templates/       ← models
     ↑
 collectors/      ← models, utils
 publishers/      ← models, utils
     ↑
-generators/      ← templates, collectors, models
+generators/      ← templates, collectors, models, utils
 ```
 
 **禁止される依存**:
@@ -419,12 +405,12 @@ generators/      ← templates, collectors, models
 **構造**:
 ```
 .claude/
-├── commands/                # スラッシュコマンド
-├── skills/                  # タスクモード別スキル
+├── skills/                  # タスクモード別スキル（スラッシュコマンドはスキルとして実装）
 │   ├── create-blog-post/    # ブログ記事生成スキル
 │   ├── publish-to-x/        # X（Twitter）投稿スキル
 │   ├── publish-to-wordpress/ # WordPress投稿スキル
 │   ├── wordpress-setup/     # WordPressセットアップスキル（Playwright MCP使用）
+│   ├── generate-image/      # Gemini 2.5 Flash Image（Nanobanana）画像生成スキル
 │   └── ...                  # 汎用スキル（steering, validation, prd-writing, glossary-creation等）
 └── settings.json            # Claude Code設定
 ```
@@ -447,3 +433,4 @@ generators/      ← templates, collectors, models
 - `.ruff_cache/`
 - `coverage/`
 - `logs/`
+- `outputs/`（画像生成・アーカイブの出力先。`outputs/.gitkeep` のみ追跡）

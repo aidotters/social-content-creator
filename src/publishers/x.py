@@ -3,9 +3,8 @@
 import asyncio
 import logging
 import os
-import typing
-
 import re
+import typing
 
 import httpx
 from authlib.integrations.httpx_client import OAuth1Auth

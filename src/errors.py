@@ -56,3 +56,10 @@ class DraftSaveError(ContentCreatorError):
     def __init__(self, path: str, message: str) -> None:
         self.path = path
         super().__init__(f"ドラフト保存エラー [{path}]: {message}")
+
+
+class ImageGenerationError(ContentCreatorError):
+    """画像生成エラー。"""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(f"画像生成エラー: {message}")

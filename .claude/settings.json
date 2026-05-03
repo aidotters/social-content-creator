@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/.claude/skills/generate-image/**)",
+      "Edit(/.claude/skills/create-blog-post/**)"
+    ]
+  }
+}

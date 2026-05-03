@@ -288,14 +288,49 @@ status: confirmed
 1. 生成した記事を**ユーザーに表示**する
 2. ユーザーに**修正ポイントを確認**する
 3. 必要に応じて記事を**修正・再保存**する
+4. **アイキャッチ画像の方針を確認**する
+   - **デフォルトは自動生成**: ステップ4の投稿時に、`build_featured_image_prompt()` が組み立てたプロンプトで `GeminiImageGenerator` がアイキャッチを自動生成し、WordPressにアップロード→アイキャッチ設定まで一括実行する
+   - ユーザーが**画像不要**と明示した場合のみ、自動生成をスキップする
+   - 既存画像を使いたい場合は、画像パスを控えておきステップ4で `featured_image_path` に渡す
+   - 個別に画像を試したい場合は `/generate-image` スキルを使用する（詳細は `.claude/skills/generate-image/SKILL.md`）
 
 ### ステップ4: WordPress投稿（ユーザーが指示した場合）
 
 1. ユーザーに**投稿ステータスを確認**する（下書き or 公開）
 2. カテゴリ・タグを確認
-3. **WordPress投稿を実行**
+3. **アイキャッチ画像の生成**（デフォルト挙動。「画像不要」の場合はスキップ）
    ```bash
-   python -c "
+   uv run python -c "
+   import asyncio
+   from pathlib import Path
+   from src.generators.blog_post import BlogPostGenerator
+   from src.generators.image import GeminiImageGenerator
+   from src.utils.image_prompt import build_featured_image_prompt
+   from src.errors import ImageGenerationError
+
+   gen_post = BlogPostGenerator()
+   post = asyncio.run(gen_post.load_draft(Path('${DRAFT_PATH}')))
+   prompt = build_featured_image_prompt(
+       content_type=post.content_type,
+       title=post.title,
+       body_excerpt=post.content[:300],
+   )
+   try:
+       gen_image = GeminiImageGenerator()
+       image_path = asyncio.run(gen_image.generate(
+           prompt=prompt, aspect_ratio='16:9', slug=post.slug,
+       ))
+       print(f'IMAGE_PATH={image_path}')
+   except ImageGenerationError as e:
+       # 画像生成失敗時は警告ログを出して画像なしで投稿継続
+       print(f'WARN: 画像生成失敗のためアイキャッチなしで投稿します: {e}')
+       print('IMAGE_PATH=')
+   "
+   ```
+4. **WordPress投稿を実行**
+   - `featured_image_path` には上記で取得した画像パス（生成失敗時は `None`）を渡す
+   ```bash
+   uv run python -c "
    import asyncio
    from pathlib import Path
    from src.publishers.wordpress import WordPressPublisher
@@ -304,7 +339,12 @@ status: confirmed
    pub = WordPressPublisher()
    gen = BlogPostGenerator()
    post = asyncio.run(gen.load_draft(Path('${DRAFT_PATH}')))
-   result = asyncio.run(pub.publish(post, status='${STATUS}'))
+   result = asyncio.run(pub.publish(
+       post,
+       status='${STATUS}',
+       featured_image_path=Path('${IMAGE_PATH}') if '${IMAGE_PATH}' else None,
+       featured_image_alt=post.title,
+   ))
    if result.success:
        print(f'投稿成功: {result.url}')
        dest = asyncio.run(gen.move_to_published(post, Path('${DRAFT_PATH}')))

@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-21
+> 最終更新: 2026-04-28
 
 # 機能設計書 (Functional Design Document)
 
@@ -9,29 +9,41 @@
 graph TB
     User[ユーザー]
     Skill["Claude Code スキル層<br/>/create-blog-post"]
+    ImageSkill["画像生成スキル<br/>/generate-image"]
     Generator["記事生成エンジン<br/>generators/"]
+    ImageGen["画像生成エンジン<br/>GeminiImageGenerator"]
     Template["テンプレート<br/>templates/"]
     Collector["情報収集ツール群<br/>collectors/"]
     Publisher["投稿先連携<br/>publishers/"]
     Storage["ローカル保存<br/>docs/drafts/ → docs/posts/"]
+    ImageStorage["画像保存<br/>outputs/images/<br/>→ outputs/images/archive/"]
     XSkill["X投稿スキル<br/>/publish-to-x"]
+    WPSkill["WordPress投稿スキル<br/>/publish-to-wordpress"]
 
     WebSearch[Web検索]
     URLFetcher[URL取得・解析]
     GeminiCLI[Gemini CLI]
-    NotionAPI[Notion API]
+    NotionAPI["Notion API<br/>(News / Paper / Medium DB)"]
     GitHubAPI[GitHub API]
+    GeminiAPI["Gemini API<br/>(gemini-2.5-flash-image)"]
 
-    WordPress[WordPress REST API]
+    WordPress["WordPress REST API<br/>upload_media + posts"]
     XAPI[X API v2]
 
     User --> Skill
     User --> XSkill
+    User --> ImageSkill
+    User --> WPSkill
     Skill --> Generator
     Generator --> Template
     Generator --> Collector
-    Generator --> Publisher
     Generator --> Storage
+
+    ImageSkill --> ImageGen
+    WPSkill --> ImageGen
+    WPSkill --> Publisher
+    ImageGen --> GeminiAPI
+    ImageGen --> ImageStorage
 
     Collector --> WebSearch
     Collector --> URLFetcher
@@ -224,6 +236,61 @@ class BlogPostGenerator:
 - ContentTemplate（テンプレート）
 - Collector群（情報収集）
 
+### GeminiImageGenerator（画像生成エンジン）
+
+**責務**:
+- Gemini API（`gemini-2.5-flash-image` / Nanobanana）を用いた画像生成
+- 生成画像のローカル保存（`outputs/images/` 配下）
+- アスペクト比指定（`1:1`, `3:4`, `4:3`, `9:16`, `16:9`）
+- ファイル名のスラッグ自動生成
+
+**インターフェース**:
+```python
+AspectRatio = Literal["1:1", "3:4", "4:3", "9:16", "16:9"]
+
+class GeminiImageGenerator:
+    """Gemini APIで画像生成するGenerator"""
+
+    def __init__(
+        self,
+        *,
+        output_dir: Path | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        """`GEMINI_API_KEY` 未設定時は `ImageGenerationError` を送出する"""
+        ...
+
+    async def generate(
+        self,
+        prompt: str,
+        *,
+        aspect_ratio: AspectRatio = "16:9",
+        filename: str | None = None,
+        slug: str | None = None,
+    ) -> Path:
+        """プロンプトから画像を生成し、ファイルに保存する。
+
+        Args:
+            prompt: 画像生成プロンプト
+            aspect_ratio: アスペクト比（既定: 16:9）
+            filename: 保存ファイル名（拡張子込み）。指定時は `slug` を無視
+            slug: ファイル名の接頭辞。未指定時はプロンプトから自動生成
+
+        Returns:
+            保存した画像ファイルのパス
+
+        Raises:
+            ImageGenerationError: 空プロンプト・API呼び出し失敗・画像未取得・セーフティ拒否時
+        """
+        ...
+```
+
+**依存関係**:
+- `google-genai`（Gemini API クライアント）
+- `Pillow`（画像保存。`google-genai` の transitive 依存）
+- 環境変数 `GEMINI_API_KEY`
+- `src.errors.ImageGenerationError`
+
 ### PublisherProtocol（投稿共通プロトコル）
 
 **インターフェース**:
@@ -260,8 +327,49 @@ class WordPressPublisher:
         status: Literal["draft", "publish"] = "draft",
         categories: list[str] | None = None,
         tags: list[str] | None = None,
+        featured_image_path: Path | None = None,
+        featured_image_alt: str | None = None,
+        force_featured_image: bool = False,
+        **kwargs: object,
     ) -> PublishResult:
-        """記事をWordPressに投稿する"""
+        """記事をWordPressに投稿する。
+
+        featured_image_path 指定時は事前に upload_media() でアップロードし、
+        投稿payloadの featured_media にセットする。featured_image_alt が
+        未指定の場合は post.title を使用。force_featured_image は publish()
+        では未使用で、スキル層が set_featured_media() を直接呼ぶ際の互換引数。
+        """
+        ...
+
+    async def upload_media(
+        self,
+        image_path: Path,
+        alt_text: str,
+        title: str | None = None,
+    ) -> int:
+        """画像をWordPressメディアライブラリにアップロードし media_id を返す。
+
+        multipart で alt_text が反映されないケースに備え、別エンドポイントで
+        alt_text/title を再更新する。成功時はローカルファイルを
+        outputs/images/archive/ へ移動する。
+        """
+        ...
+
+    async def set_featured_media(
+        self,
+        post_id: int,
+        media_id: int,
+        force: bool = False,
+    ) -> None:
+        """既存投稿に featured_media を設定する。
+
+        既存アイキャッチが 0 以外の場合、force=False ならエラーを投げる。
+        後付けでアイキャッチを設定する用途（スキル層の --post-id 経路）で使用。
+        """
+        ...
+
+    async def get_post(self, post_id: int) -> dict[str, object]:
+        """既存記事の情報をWordPress REST APIから取得する"""
         ...
 
     async def get_categories(self) -> list[dict[str, object]]:
@@ -272,6 +380,9 @@ class WordPressPublisher:
         """WordPress上のタグ一覧を取得する"""
         ...
 ```
+
+**投稿フロー上の補足**:
+- `post.subtitle` が指定されている場合、`publish()` は投稿後に取得した `post_id` / `post_url` を用いて `excerpt` を 2 段階目で再更新する。最終的な `excerpt` は `"{subtitle}… <a class=\"more-link\" href=\"{post_url}\">続きを読む</a>"` 形式となる（一覧表示で「続きを読む」リンクを表示するため）。
 
 **依存関係**:
 - httpx（HTTP通信）
@@ -395,7 +506,39 @@ sequenceDiagram
 5. 承認後、ローカルに保存してからWordPressに投稿
 6. 投稿結果をユーザーに報告
 
-### ユースケース2: 情報収集のみ
+### ユースケース2: アイキャッチ画像の自動生成と WordPress 添付
+
+```mermaid
+sequenceDiagram
+    participant User as ユーザー
+    participant Skill as /publish-to-wordpress スキル
+    participant Prompt as build_featured_image_prompt
+    participant ImageGen as GeminiImageGenerator
+    participant GeminiAPI as Gemini API
+    participant Publisher as WordPressPublisher
+    participant WordPress as WordPress REST API
+    participant FS as outputs/images/
+
+    User->>Skill: /publish-to-wordpress {draft.md} --auto-generate-image
+    Skill->>Prompt: build_featured_image_prompt(content_type, title, body_excerpt)
+    Prompt-->>Skill: 英語プロンプト
+    Skill->>ImageGen: generate(prompt, aspect_ratio="16:9", slug)
+    ImageGen->>GeminiAPI: generate_content(gemini-2.5-flash-image)
+    GeminiAPI-->>ImageGen: image bytes
+    ImageGen->>FS: 画像を outputs/images/ に保存
+    ImageGen-->>Skill: 画像ファイルパス
+    Skill->>Publisher: upload_media(画像)
+    Publisher->>WordPress: POST /wp-json/wp/v2/media
+    WordPress-->>Publisher: media_id
+    Skill->>Publisher: publish(post, featured_media=media_id)
+    Publisher->>WordPress: POST /wp-json/wp/v2/posts
+    WordPress-->>Publisher: PublishResult
+    Skill->>FS: 画像を outputs/images/archive/ へ移動
+    Publisher-->>Skill: PublishResult
+    Skill-->>User: 投稿結果（URL等）
+```
+
+### ユースケース3: 情報収集のみ
 
 ```mermaid
 sequenceDiagram
@@ -499,7 +642,9 @@ src/templates/
 └── feature.py
 ```
 
-## ユーティリティ関数（src/utils/markdown.py）
+## ユーティリティ関数
+
+### `src/utils/markdown.py`
 
 | 関数 | 説明 |
 |------|------|
@@ -507,7 +652,14 @@ src/templates/
 | `read_frontmatter_markdown(path)` | front matter付きMarkdownファイルを読み込み `(metadata, content)` を返す |
 | `generate_slug(title)` | タイトルからURLスラッグを生成する（日本語除去、英数字+ハイフンのみ） |
 | `markdown_to_html(text)` | MarkdownテキストをHTMLに変換する（`markdown` ライブラリ使用） |
+| `html_to_gutenberg_blocks(html)` | HTMLをWordPress Gutenbergブロック形式に変換（見出し/段落/リスト/コード/表/引用/区切りに対応） |
 | `count_characters(text)` | Markdown記法を除去して文字数をカウントする |
+
+### `src/utils/image_prompt.py`
+
+| 関数 | 説明 |
+|------|------|
+| `build_featured_image_prompt(content_type, title, body_excerpt="")` | コンテンツタイプ別スタイル指示・タイトル・本文抜粋（最大300文字）を組み合わせ、英語のアイキャッチ画像プロンプトを生成 |
 
 ## パフォーマンス最適化
 
@@ -537,6 +689,7 @@ src/templates/
 | X API認証エラー | リトライ不可、設定確認を案内 | 「認証に失敗しました。.envのX_API_KEY等を確認してください」 |
 | X API通信エラー | 1回リトライ後に失敗 | 「通信エラー: {error}」 |
 | X投稿文字数超過 | 投稿前にバリデーション | 「投稿テキストが280文字を超えています（{N}文字超過）」 |
+| 画像生成エラー | `ImageGenerationError` を送出 | 「画像生成エラー: {原因}」（API呼び出し失敗・セーフティ拒否・空プロンプト等） |
 
 ## テスト戦略
 

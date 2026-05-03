@@ -78,3 +78,6 @@ docs/refs/
 
 images/
 temp/
+
+outputs/
+!outputs/.gitkeep

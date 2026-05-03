@@ -1,5 +1,5 @@
 > **ステータス: 実装済み**
-> 最終更新: 2026-02-21
+> 最終更新: 2026-04-28
 
 # 技術仕様書 (Architecture Design Document)
 
@@ -23,7 +23,8 @@
 | authlib | 1.3+ | OAuth認証 | X API OAuth 1.0a認証 |
 | markdown | 3.10+ | Markdown→HTML変換 | 記事本文のHTML変換に使用 |
 | python-dotenv | 1.0+ | 環境変数読み込み | .envファイルの読み込み |
-| google-genai | 1.63+ | Gemini API | GeminiCollector用 |
+| google-genai | 1.63+ | Gemini API | GeminiCollector / GeminiImageGenerator 用 |
+| Pillow (PIL) | - (transitive) | 画像処理 | `google-genai` の transitive 依存（`pyproject.toml` に直接依存記載なし）。`GeminiImageGenerator` でレスポンス画像の保存に利用 |
 
 ### 開発ツール
 
@@ -140,7 +141,9 @@ docs/posts/
 ```
 生成 → docs/drafts/{content_type}/YYYYMMDD(作成日)-{slug}.md に保存
   → レビュー・編集（同ファイルを更新）
-  → WordPress投稿
+  → アイキャッチ画像生成（GeminiImageGenerator + build_featured_image_prompt）
+  → WordPress投稿（upload_media → posts 作成、payload に featured_media をセット）
+  → 画像をアーカイブ（outputs/images/archive/）へ移動
   → docs/posts/YYYY/MM/YYYYMMDD(投稿日)-{content_type}-{slug}.md に移動（日付はリネーム）
 ```
 
@@ -247,6 +250,9 @@ docs/posts/
 | pydantic | データモデル | メジャーバージョン固定（2.x） |
 | python-frontmatter | Markdownメタデータ | 最新 |
 | jinja2 | テンプレートエンジン | メジャーバージョン固定（3.x） |
+| markdown | Markdown→HTML変換 | マイナーバージョン範囲指定（3.10+） |
+| python-dotenv | 環境変数読み込み | メジャーバージョン固定（1.x） |
+| google-genai | Gemini API（Collector / 画像生成） | マイナーバージョン範囲指定（1.63+） |
 | pytest | テスト | 最新 |
 | ruff | Lint | 最新 |
 | mypy | 型チェック | 最新 |

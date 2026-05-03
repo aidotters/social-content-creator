@@ -32,11 +32,11 @@ uv run mypy src/
 ### Key Directories
 - `src/`: ソースコード
   - `src/models/`: データモデル（BlogPost, CollectedData, PublishResult, XPublishResult, ContentTemplate）
-  - `src/generators/`: 記事生成エンジン（BlogPostGenerator）
+  - `src/generators/`: 記事・画像生成エンジン（BlogPostGenerator, GeminiImageGenerator）
   - `src/collectors/`: 情報収集ツール群（URL, GitHub, Gemini, WebSearch, NotionNews, NotionPaper, NotionMedium）
   - `src/publishers/`: 投稿連携（WordPressPublisher, XPublisher）
   - `src/templates/`: コンテンツタイプ別テンプレート（8種類）
-  - `src/utils/`: ユーティリティ（Markdown処理）
+  - `src/utils/`: ユーティリティ（Markdown処理、アイキャッチ画像プロンプト組み立て）
   - `src/errors.py`: カスタムエラークラス
 - `tests/`: テストコード
   - `tests/unit/`: ユニットテスト
@@ -47,10 +47,14 @@ uv run mypy src/
   - `docs/posts/`: 投稿済み記事
   - `docs/ideas/`: アイデア・ブレインストーミング
   - `docs/briefs/`: ブレスト結果の方針メモ（記事生成前のブリーフ）
+  - `docs/refs/`: 調査レポート・参考資料
 - `.claude/skills/create-blog-post/`: ブログ記事生成スキル
 - `.claude/skills/publish-to-x/`: X（Twitter）投稿スキル
 - `.claude/skills/publish-to-wordpress/`: WordPress投稿スキル
 - `.claude/skills/wordpress-setup/`: WordPressセットアップスキル（Playwright MCP使用）
+- `.claude/skills/generate-image/`: Gemini 2.5 Flash Image（Nanobanana）による画像生成スキル
+- `outputs/images/`: 画像生成の出力先（gitignore対象）
+  - `outputs/images/archive/`: WordPressアップロード成功後のアーカイブ先
 - `.steering/`: 作業計画・タスク管理ファイル
 
 ### Design Patterns

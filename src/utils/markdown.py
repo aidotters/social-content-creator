@@ -7,6 +7,8 @@ from pathlib import Path
 import frontmatter
 import markdown as md  # type: ignore[import-untyped]
 
+_BLOCK_TAGS = r"h[1-6]|p|pre|ul|ol|table|blockquote|div|figure"
+
 
 def write_frontmatter_markdown(path: Path, metadata: dict[str, object], content: str) -> None:
     """front matter付きMarkdownファイルを書き出す。
@@ -86,8 +88,6 @@ def html_to_gutenberg_blocks(html: str) -> str:
     """
     blocks: list[str] = []
     remaining = html.strip()
-
-    _BLOCK_TAGS = r"h[1-6]|p|pre|ul|ol|table|blockquote|div|figure"
 
     while remaining:
         remaining = remaining.lstrip()

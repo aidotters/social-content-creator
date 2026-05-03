@@ -47,19 +47,38 @@ cp .env.example .env
 ### WordPressに投稿
 
 ```bash
-# ドラフト記事をWordPressに下書き投稿
-/publish-to-wordpress docs/drafts/2026-02-17-example.md
+# ドラフト記事をWordPressに下書き投稿（コンテンツタイプ別サブディレクトリ構造）
+/publish-to-wordpress docs/drafts/weekly-ai-news/20260217-weekly-ai-news-feb-w3.md
 
 # 公開投稿
-/publish-to-wordpress docs/drafts/2026-02-17-example.md --status publish
+/publish-to-wordpress docs/drafts/weekly-ai-news/20260217-weekly-ai-news-feb-w3.md --status publish
+
+# アイキャッチ画像を指定して投稿
+/publish-to-wordpress docs/drafts/paper-review/20260217-arxiv-xxxx.md --featured-image outputs/images/hero.png
+
+# アイキャッチ画像を自動生成して投稿
+/publish-to-wordpress docs/drafts/tool-tips/20260217-claude-tips.md --auto-generate-image
+
+# 既存記事に後からアイキャッチを設定（--force で上書き可）
+# ※ スキル層が WordPressPublisher.set_featured_media() を呼び出して実現
+/publish-to-wordpress --post-id 12345 --featured-image outputs/images/hero.png
 ```
 
 ### X（Twitter）に投稿
 
 ```bash
 # 記事の紹介をXに投稿
-/publish-to-x docs/posts/2026-02-17-example.md
+/publish-to-x docs/posts/2026/02/20260217-weekly-ai-news-feb-w3.md
 ```
+
+### 画像を生成
+
+```bash
+# Gemini 2.5 Flash Image（Nanobanana）でアイキャッチ画像等を生成
+/generate-image "modern tech news magazine cover, futuristic UI elements"
+```
+
+生成画像は `outputs/images/` に保存され、WordPressアップロード成功時は `outputs/images/archive/` に移動されます。
 
 ## 開発
 
@@ -81,13 +100,20 @@ uv run black .
 
 ```
 スキル層（Claude Code Skills） ← ユーザーインターフェース
+  ・/create-blog-post  ・/publish-to-wordpress  ・/publish-to-x  ・/generate-image
   ↕
 ツール層（Python バックエンド） ← ビジネスロジック
-  ├── generators/  記事生成
-  ├── collectors/  情報収集
-  ├── publishers/  投稿連携
-  ├── templates/   テンプレート
-  └── models/      データモデル
+  ├── generators/  記事生成（BlogPostGenerator） / 画像生成（GeminiImageGenerator → Gemini API）
+  ├── collectors/  情報収集（WebSearch, URL, Gemini, GitHub, NotionNews/Paper/Medium DB）
+  ├── publishers/  投稿連携（WordPress REST API, X API v2）
+  ├── templates/   コンテンツタイプ別テンプレート
+  ├── utils/       Markdown処理・Gutenbergブロック化・画像プロンプト組み立て
+  ├── models/      データモデル
+  └── errors.py    カスタムエラー（ContentCreatorError 系）
+
+外部サービス: WordPress / X API / Notion API（News・Paper・Medium DB）/
+              Gemini API（gemini-2.5-flash-image）/ GitHub API / Web検索
+ローカル出力: docs/drafts/{type}/ → docs/posts/YYYY/MM/ ; outputs/images/ → outputs/images/archive/
 ```
 
 ## 環境変数
@@ -97,7 +123,7 @@ uv run black .
 | `WORDPRESS_URL` | WordPressサイトURL |
 | `WORDPRESS_USER` | WordPressユーザー名 |
 | `WORDPRESS_APP_PASSWORD` | WordPress Application Password |
-| `GEMINI_API_KEY` | Gemini APIキー（オプション） |
+| `GEMINI_API_KEY` | Gemini APIキー（GeminiCollector / GeminiImageGenerator 使用時に必須） |
 | `GITHUB_TOKEN` | GitHub APIトークン（オプション） |
 | `X_API_KEY` | X API Key（オプション） |
 | `X_API_SECRET` | X API Secret（オプション） |
