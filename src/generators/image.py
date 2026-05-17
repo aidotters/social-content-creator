@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
@@ -37,6 +38,7 @@ class GeminiImageGenerator:
         output_dir: Path | None = None,
         api_key: str | None = None,
     ) -> None:
+        load_dotenv()
         self._output_dir = output_dir or Path("outputs/images")
         self._api_key = api_key or os.environ.get("GEMINI_API_KEY")
         if not self._api_key:

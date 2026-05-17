@@ -19,6 +19,36 @@ _CONTENT_TYPE_STYLES: dict[ContentType, str] = {
     "feature": ("cinematic hero image, dramatic lighting, high impact"),
 }
 
+# 各記事タイプの抽象的なビジュアルテーマ（英語）。
+# 日本語タイトル・本文をプロンプトに渡すと画像モデルが文字を描画しようと
+# するため、テキスト誘発を避ける目的でこの英語テーマのみを被写体に使う。
+_CONTENT_TYPE_SUBJECTS: dict[ContentType, str] = {
+    "weekly-ai-news": "abstract artificial intelligence and technology news concept",
+    "paper-review": "abstract academic research and scientific discovery concept",
+    "project-intro": "abstract open-source software project concept",
+    "tool-tips": "abstract developer tools and productivity concept",
+    "market-analysis": "abstract financial market and AI investment concept",
+    "ml-practice": "abstract machine learning and data analysis concept",
+    "cv": "abstract computer vision and image recognition concept",
+    "feature": "abstract in-depth AI technology feature concept",
+}
+
+# テキスト描画を徹底的に抑制するための強い否定指示。
+_NO_TEXT_DIRECTIVE = (
+    "Absolutely no text of any kind: no Japanese characters, no kanji, no kana, "
+    "no English letters, no words, no numbers, no captions, no labels, "
+    "no UI text, no logos, no watermarks, no signage. "
+    "Purely visual illustration with shapes, colors and imagery only."
+)
+
+# 過去記事との見た目の平仄を合わせるための構図指示。
+# 被写体を中央の横帯に収めず、フレーム全体を端まで埋める full-bleed 構図にする。
+_COMPOSITION_DIRECTIVE = (
+    "Full-bleed composition that fills the entire 16:9 frame edge to edge. "
+    "No border, no inner frame, no letterbox bars, no empty margins. "
+    "The main subject is balanced and fills the vertical space of the frame."
+)
+
 
 def build_featured_image_prompt(
     content_type: ContentType,
@@ -36,17 +66,17 @@ def build_featured_image_prompt(
         英語ベースの画像生成プロンプト文字列。
     """
     style = _CONTENT_TYPE_STYLES[content_type]
-    excerpt = body_excerpt.strip()
-    if len(excerpt) > _BODY_EXCERPT_MAX_LENGTH:
-        excerpt = excerpt[:_BODY_EXCERPT_MAX_LENGTH]
+    subject = _CONTENT_TYPE_SUBJECTS[content_type]
 
+    # 日本語の title / body_excerpt はプロンプトに含めない。
+    # 画像モデルがそれらを文字として描画し、崩れた日本語が混入するため、
+    # 被写体は英語の抽象テーマのみで表現する。
     parts = [
-        f"Featured image for a Japanese AI engineering blog post titled " f'"{title}".',
+        f"Featured image for an AI engineering blog post: {subject}.",
         f"Style: {style}.",
-        "No text, no captions, no logos, no watermarks.",
+        _NO_TEXT_DIRECTIVE,
+        _COMPOSITION_DIRECTIVE,
         "16:9 aspect ratio, high quality, suitable as a WordPress hero image.",
     ]
-    if excerpt:
-        parts.insert(2, f"Article context: {excerpt}")
 
     return " ".join(parts)

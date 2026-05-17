@@ -16,37 +16,24 @@ def test_style_string_for_each_content_type(content_type: ContentType) -> None:
     assert _CONTENT_TYPE_STYLES[content_type] in prompt
 
 
-def test_title_included_in_prompt() -> None:
-    """タイトルがプロンプトに含まれる。"""
+def test_japanese_title_not_rendered_in_prompt() -> None:
+    """日本語タイトルはプロンプトに含めない（画像への文字描画を防ぐため）。"""
     prompt = build_featured_image_prompt(
         content_type="weekly-ai-news",
         title="今週のAIニュース総まとめ",
     )
-    assert "今週のAIニュース総まとめ" in prompt
+    assert "今週のAIニュース総まとめ" not in prompt
 
 
-def test_body_excerpt_included_when_provided() -> None:
-    """本文冒頭が指定された場合にプロンプトへ含まれる。"""
+def test_japanese_body_excerpt_not_rendered_in_prompt() -> None:
+    """日本語の本文冒頭はプロンプトに含めない（画像への文字描画を防ぐため）。"""
     excerpt = "この記事ではAIの最新動向を紹介します。"
     prompt = build_featured_image_prompt(
         content_type="weekly-ai-news",
         title="タイトル",
         body_excerpt=excerpt,
     )
-    assert excerpt in prompt
-
-
-def test_body_excerpt_truncated_at_300_chars() -> None:
-    """本文冒頭が300文字を超える場合に切り詰められる。"""
-    long_excerpt = "あ" * 500
-    prompt = build_featured_image_prompt(
-        content_type="paper-review",
-        title="タイトル",
-        body_excerpt=long_excerpt,
-    )
-    assert "あ" * 300 in prompt
-    # 切り詰めにより301文字目以降は含まれない（"あ" * 301 が含まれていないこと）
-    assert "あ" * 301 not in prompt
+    assert excerpt not in prompt
 
 
 def test_no_body_excerpt_omits_context_section() -> None:
@@ -59,9 +46,10 @@ def test_no_body_excerpt_omits_context_section() -> None:
 
 
 def test_prompt_includes_no_text_constraint() -> None:
-    """生成画像にテキストを入れないよう制約が含まれる。"""
+    """生成画像にテキストを入れないよう強い制約が含まれる。"""
     prompt = build_featured_image_prompt(
         content_type="feature",
         title="特集記事",
     )
-    assert "No text" in prompt
+    assert "Absolutely no text" in prompt
+    assert "no Japanese characters" in prompt
