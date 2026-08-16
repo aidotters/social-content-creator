@@ -29,6 +29,26 @@ def site_repo(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
+def remote_repo(tmp_path: Path, site_repo: Path) -> Path:
+    """site_repo の push 先となる bare リポジトリ。"""
+    remote = tmp_path / "remote.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(remote)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "remote", "add", "origin", str(remote)],
+        cwd=site_repo,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "push", "-q", "-u", "origin", "HEAD"],
+        cwd=site_repo,
+        check=True,
+        capture_output=True,
+    )
+    return remote
+
+
+@pytest.fixture
 def publisher(site_repo: Path) -> StaticSitePublisher:
     return StaticSitePublisher(site_repo=site_repo)
 
@@ -73,6 +93,12 @@ def test_weekly_slug_uses_publish_date(
 ) -> None:
     # タイトルの「第N週」表記は過去に重複した実績があるため使わない
     assert publisher.resolve_slug(weekly_post) == "2026-08-02"
+
+
+def test_weekly_slug_uses_jst_date(publisher: StaticSitePublisher, weekly_post: BlogPost) -> None:
+    # UTC の 8/2 22:00 は日本時間では 8/3。日本の夜に書いた記事が前日扱いにならないこと
+    weekly_post.created_at = datetime(2026, 8, 2, 22, 0, tzinfo=UTC)
+    assert publisher.resolve_slug(weekly_post) == "2026-08-03"
 
 
 def test_non_weekly_slug_uses_post_slug(
@@ -175,6 +201,37 @@ async def test_publish_duplicate_slug_raises(
     await publisher.publish(weekly_post, status="publish")
     with pytest.raises(StaticSitePublishError, match="既に存在"):
         await publisher.publish(weekly_post, status="publish")
+
+
+async def test_publish_does_not_push_by_default(
+    publisher: StaticSitePublisher, weekly_post: BlogPost, remote_repo: Path
+) -> None:
+    # push した時点でサイトのデプロイが走るため、既定では push しない
+    await publisher.publish(weekly_post, status="publish")
+
+    log = subprocess.run(
+        ["git", "log", "--oneline"],
+        cwd=remote_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert weekly_post.title not in log.stdout
+
+
+async def test_publish_pushes_when_requested(
+    publisher: StaticSitePublisher, weekly_post: BlogPost, remote_repo: Path
+) -> None:
+    await publisher.publish(weekly_post, status="publish", push=True)
+
+    log = subprocess.run(
+        ["git", "log", "--oneline"],
+        cwd=remote_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert weekly_post.title in log.stdout
 
 
 async def test_publish_overwrite_replaces_content(

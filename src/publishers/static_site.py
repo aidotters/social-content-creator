@@ -10,6 +10,7 @@ frontmatter はサイト側の zod スキーマ（src/content.config.ts）と対
 import os
 import re
 import subprocess
+from datetime import timedelta, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,6 +19,9 @@ from src.errors import StaticSitePublishError
 from src.models.blog_post import BlogPost, PublishResult
 
 _CONTENT_DIR = Path("src/content/blog")
+
+# slug に使う日付は日本時間で決める。UTC のままだと日本の夜に書いた記事が前日扱いになる。
+_JST = timezone(timedelta(hours=9))
 
 # サイト側 zod スキーマが受け付けるキー。ここに無いキーは書き出さない。
 _FRONTMATTER_ORDER = ("title", "subtitle", "date", "published_at", "type", "status")
@@ -54,7 +58,7 @@ class StaticSitePublisher:
         一意性が保証される公開日ベースにする。それ以外は生成時のslugを使う。
         """
         if post.content_type == "weekly-ai-news":
-            return (post.published_at or post.created_at).strftime("%Y-%m-%d")
+            return (post.published_at or post.created_at).astimezone(_JST).strftime("%Y-%m-%d")
         slug = post.slug.strip().strip("/")
         if not slug:
             raise StaticSitePublishError(f"slugが空です: {post.title}")
@@ -88,6 +92,7 @@ class StaticSitePublisher:
         post: BlogPost,
         status: str = "draft",
         commit: bool = True,
+        push: bool = False,
         overwrite: bool = False,
         **kwargs: object,
     ) -> PublishResult:
@@ -97,6 +102,8 @@ class StaticSitePublisher:
             post: 投稿するBlogPost
             status: "publish" なら公開扱い、それ以外はサイト側でビルド対象外の下書き
             commit: git commit まで行うか
+            push: commit 後に push するか。push した時点でサイトのデプロイが走るため、
+                既定では行わない（呼び出し側で明示的に指定する）
             overwrite: 既存ファイルを上書きするか
             **kwargs: 未使用
 
@@ -127,7 +134,23 @@ class StaticSitePublisher:
         url = f"/blog/{post.content_type}/{self.resolve_slug(post)}/"
         if commit:
             self._commit(path, post)
+            if push:
+                self._push()
         return PublishResult(success=True, url=url)
+
+    def _push(self) -> None:
+        try:
+            subprocess.run(
+                ["git", "push"],
+                cwd=self._repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            raise StaticSitePublishError(
+                f"git push に失敗しました（commit は完了しています）: {exc.stderr or exc.stdout}"
+            ) from exc
 
     def _commit(self, path: Path, post: BlogPost) -> None:
         rel = path.relative_to(self._repo)

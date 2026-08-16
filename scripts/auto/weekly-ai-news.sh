@@ -8,7 +8,7 @@ set -uo pipefail
 # launchd は最小環境で動くため、claude / uv のパスを明示する。
 export PATH="/Users/tak/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
-PROJECT_DIR="/Users/tak/Projects/social-content-creator"
+PROJECT_DIR="/Users/tak/Projects/tools/social-content-creator"
 LOG_DIR="$PROJECT_DIR/outputs/logs"
 DRAFTS_DIR="$PROJECT_DIR/docs/drafts"
 
