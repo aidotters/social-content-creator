@@ -5,7 +5,7 @@ description: ドラフト記事を静的サイト（aidotters.com / Astro）に�
 
 # publish-to-site スキル
 
-ドラフト記事を静的サイト `aidotters-web-page` へ公開するスキルです。
+ドラフト記事を静的サイト `aidotters-website` へ公開するスキルです。
 WordPress REST API への投稿（`publish-to-wordpress`）を置き換えるものです。
 
 ## コマンド形式

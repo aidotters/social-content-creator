@@ -40,7 +40,7 @@ class WordPressPublishError(ContentCreatorError):
 
 
 class StaticSitePublishError(ContentCreatorError):
-    """静的サイト（aidotters-web-page）への書き出しエラー。"""
+    """静的サイト（aidotters-website）への書き出しエラー。"""
 
     def __init__(self, message: str) -> None:
         super().__init__(f"静的サイト投稿エラー: {message}")

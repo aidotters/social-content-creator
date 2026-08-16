@@ -1,4 +1,4 @@
-"""静的サイト（aidotters-web-page）へ記事を書き出すPublisher。
+"""静的サイト（aidotters-website）へ記事を書き出すPublisher。
 
 WordPress REST API への投稿を置き換えるもの。記事Markdownをサイトリポジトリの
 `src/content/blog/{type}/{slug}.md` へ配置し、git commit するところまでを行う。

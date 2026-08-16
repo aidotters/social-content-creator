@@ -14,7 +14,7 @@ from src.publishers.static_site import StaticSitePublisher
 @pytest.fixture
 def site_repo(tmp_path: Path) -> Path:
     """記事の書き出し先となる空のgitリポジトリ。"""
-    repo = tmp_path / "aidotters-web-page"
+    repo = tmp_path / "aidotters-website"
     repo.mkdir()
     for args in (
         ["git", "init", "-q"],
