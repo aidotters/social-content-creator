@@ -22,7 +22,7 @@ from src.models.blog_post import BlogPost, PublishResult
 _CONTENT_DIR = Path("src/content/blog")
 
 # アイキャッチはサイト側で image() スキーマに通すため、記事Markdownと同じ
-# ディレクトリに置いて相対パスで参照する。詳細はサイトの AGENTS.md を参照。
+# ディレクトリに置いて相対パスで参照する。詳細はサイトの CLAUDE.md を参照。
 _IMAGE_SUFFIX = ".webp"
 # 元画像は 1344x768 の PNG で 1.5MB 前後。リポジトリに毎週積むには重いので落とす。
 # 88 は文字を載せた生成画像でも滲みが出ない範囲で選んだ値（実測で 150KB 前後）。
