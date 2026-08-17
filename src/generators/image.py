@@ -17,8 +17,6 @@ from src.errors import ImageGenerationError
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from PIL.Image import Image
-
 AspectRatio = Literal["1:1", "3:4", "4:3", "9:16", "16:9"]
 
 _MODEL = "gemini-2.5-flash-image"
@@ -105,7 +103,9 @@ class GeminiImageGenerator:
         return self._output_dir / f"{timestamp}-{base}.png"
 
 
-def _extract_first_image(parts: Iterable[types.Part] | None) -> Image | None:
+# part.as_image() が返すのは PIL ではなく google-genai の Image。
+# Pillow が入っていなかった間は PIL.Image を指したまま検査を素通りしていた。
+def _extract_first_image(parts: Iterable[types.Part] | None) -> types.Image | None:
     if parts is None:
         return None
     for part in parts:
