@@ -244,3 +244,79 @@ async def test_publish_overwrite_replaces_content(
     assert result.success
     text = (site_repo / "src/content/blog/weekly-ai-news/2026-08-02.md").read_text(encoding="utf-8")
     assert "差し替え後" in text
+
+
+@pytest.fixture
+def source_image(tmp_path: Path) -> Path:
+    """アイキャッチの元画像（生成器が吐くのと同じ 1344x768 の PNG）。"""
+    from PIL import Image
+
+    path = tmp_path / "20260802-232949-202681ai.png"
+    Image.new("RGB", (1344, 768), (11, 16, 32)).save(path)
+    return path
+
+
+async def test_publish_attaches_image_next_to_markdown(
+    publisher: StaticSitePublisher,
+    weekly_post: BlogPost,
+    site_repo: Path,
+    source_image: Path,
+) -> None:
+    await publisher.publish(weekly_post, status="publish", featured_image_path=source_image)
+
+    image = site_repo / "src/content/blog/weekly-ai-news/2026-08-02.webp"
+    assert image.is_file()
+    text = (site_repo / "src/content/blog/weekly-ai-news/2026-08-02.md").read_text(encoding="utf-8")
+    # サイト側は image() スキーマで解決するため、記事から見た相対パスであること
+    assert "image: './2026-08-02.webp'" in text
+
+
+async def test_publish_commits_image_with_markdown(
+    publisher: StaticSitePublisher,
+    weekly_post: BlogPost,
+    site_repo: Path,
+    source_image: Path,
+) -> None:
+    """画像がコミットに入らないと、frontmatter だけが指してサイトのビルドが落ちる。"""
+    await publisher.publish(weekly_post, status="publish", featured_image_path=source_image)
+
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=site_repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert status.stdout == ""
+
+
+async def test_publish_overwrite_keeps_existing_image(
+    publisher: StaticSitePublisher,
+    weekly_post: BlogPost,
+    site_repo: Path,
+    source_image: Path,
+) -> None:
+    """画像を渡さずに上書き publish しても、既にある画像の参照を落とさない。"""
+    await publisher.publish(weekly_post, status="publish", featured_image_path=source_image)
+    weekly_post.content = "## 差し替え後\n\n新しい本文。"
+    await publisher.publish(weekly_post, status="publish", overwrite=True)
+
+    text = (site_repo / "src/content/blog/weekly-ai-news/2026-08-02.md").read_text(encoding="utf-8")
+    assert "image: './2026-08-02.webp'" in text
+    assert (site_repo / "src/content/blog/weekly-ai-news/2026-08-02.webp").is_file()
+
+
+async def test_publish_without_image_omits_key(
+    publisher: StaticSitePublisher, paper_post: BlogPost, site_repo: Path
+) -> None:
+    await publisher.publish(paper_post, status="publish")
+
+    text = (site_repo / "src/content/blog/paper-review/skillclaw.md").read_text(encoding="utf-8")
+    assert "image:" not in text
+
+
+def test_attach_image_missing_file_raises(
+    publisher: StaticSitePublisher, weekly_post: BlogPost, tmp_path: Path
+) -> None:
+    with pytest.raises(StaticSitePublishError):
+        publisher.attach_image(weekly_post, tmp_path / "存在しない.png")

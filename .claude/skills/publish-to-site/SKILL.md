@@ -11,7 +11,7 @@ WordPress REST API への投稿（`publish-to-wordpress`）を置き換えるも
 ## コマンド形式
 
 ```
-/publish-to-site <draft-path> [--status draft|publish] [--push]
+/publish-to-site <draft-path> [--status draft|publish] [--image <path>] [--push]
 ```
 
 ## 引数
@@ -20,6 +20,7 @@ WordPress REST API への投稿（`publish-to-wordpress`）を置き換えるも
 |------|------|------|------|
 | `<draft-path>` | Yes | — | `docs/drafts/{type}/*.md` のパス |
 | `--status` | No | `publish` | `publish` で公開、`draft` でサイト側のビルド対象外 |
+| `--image` | No | 無し | アイキャッチ画像のローカルパス（`/generate-image` の出力）。WebP に変換して記事の隣に置く |
 | `--push` | No | 無効 | commit 後に push する。**push した時点で本番サイトのデプロイが走る** |
 
 ## 前提条件
@@ -71,7 +72,7 @@ from src.publishers.static_site import StaticSitePublisher
 gen = BlogPostGenerator()
 post = asyncio.run(gen.load_draft(Path('${DRAFT_PATH}')))
 pub = StaticSitePublisher()
-result = asyncio.run(pub.publish(post, status='${STATUS}', commit=False))
+result = asyncio.run(pub.publish(post, status='${STATUS}', commit=False, featured_image_path=${IMAGE_PATH_OR_NONE}))
 print(f'書き出し完了: {result.url}')
 "
 ```
@@ -105,7 +106,7 @@ from src.publishers.static_site import StaticSitePublisher
 gen = BlogPostGenerator()
 post = asyncio.run(gen.load_draft(Path('${DRAFT_PATH}')))
 pub = StaticSitePublisher()
-result = asyncio.run(pub.publish(post, status='${STATUS}', overwrite=True))
+result = asyncio.run(pub.publish(post, status='${STATUS}', overwrite=True, featured_image_path=${IMAGE_PATH_OR_NONE}))
 print(f'コミット完了: {result.url}')
 "
 ```
@@ -144,8 +145,9 @@ print(f'コミット完了: {result.url}')
 
 ## 注意事項
 
-- **アイキャッチ画像は未対応**。サイト側の画像設計が決まってから追加する
-  （現在の zod スキーマに画像フィールドが無いため、追加するとビルドが落ちる）
+- **アイキャッチ画像**は `--image` で渡す。未指定なら `featured_image_path=None` にする。
+  変換先は記事Markdownの隣（`{type}/{slug}.webp`）で、frontmatter には相対パスが入る。
+  既に画像が置かれている記事を `--image` 無しで上書き publish しても参照は残る
 - **コミット先ブランチ**は、サイトリポジトリでチェックアウト中のブランチになる。
   公開時は意図したブランチにいることを確認する
 - frontmatter の形は `src/publishers/static_site.py` とサイト側の
