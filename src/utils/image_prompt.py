@@ -85,21 +85,33 @@ _CONTENT_TYPE_STYLES: dict[ContentType, str] = {
 }
 
 # aidotters.com のトーンに合わせるブランド指示。
-# 青系は同サイトの src/styles/tokens.css（ライト側）と揃えてある:
-#   accent #1d4e7c / accent-lift #6fa3d6 / 文字色 #16202b
+#
+# 対応する色（プロンプトには hex を書かない。理由は下記）:
+#   白地      #ffffff
+#   濃紺      #17325b
+#   ブランド紺 #1d4e7c  ← サイト src/styles/tokens.css の --accent と同値
+#   中間青    #6fa3d6  ← 同 --accent-lift と同値
+#   淡青      #a8cbe8
+#   ティール  #4fb8a8 / ミント #8fd8cc
+#   イエロー  #f2c94c / サンド #f7e2a3
+#
 # ティールとイエローはイラスト専用の拡張色で、tokens.css には無い。
 # サイトの UI 色に足すかどうかは別の判断なので、ここを変えても
 # サイト側 tokens.css は追従しない点に注意。
-# 画像モデルは hex を忠実には再現しないので、色名の言語記述を併記する。
+#
+# hex をプロンプトに書いてはいけない。画像モデルは hex を色として解釈せず、
+# 端末の画面などに "6FA32D6" のような崩れた文字列として描画してしまう
+# （2026-08-22 に weekly-ai-news 12枚中4枚で実測）。色は言語記述だけで
+# 十分に再現されるため、hex はプロンプト内では純粋なノイズになる。
 _BRAND_STYLE_DIRECTIVE = (
     "Art direction: flat vector illustration, the style of modern editorial "
     "stock illustration. Bold simple filled shapes with rounded corners, "
     "no outlines or only sparse thin outlines, no shading, no gradients. "
-    "Pure white background (#ffffff). "
-    "Palette, used in this order of dominance: deep navy (#17325b) and brand navy "
-    "(#1d4e7c) for the main shapes, medium blue (#6fa3d6) and light blue (#a8cbe8) "
-    "for the secondary shapes, teal (#4fb8a8) and mint (#8fd8cc) as a lighter accent, "
-    "and warm yellow (#f2c94c) with sand (#f7e2a3) as a small highlight accent only. "
+    "Pure white background. "
+    "Palette, used in this order of dominance: deep navy and brand navy blue "
+    "for the main shapes, medium blue and light blue "
+    "for the secondary shapes, teal and mint as a lighter accent, "
+    "and warm yellow with sand as a small highlight accent only. "
     "A few simple leaf and plant sprigs may be scattered between the objects. "
     "Cheerful, clean and confident."
 )
@@ -118,7 +130,7 @@ _NO_TEXT_DIRECTIVE = (
     "Absolutely no text of any kind: no Japanese characters, no kanji, no kana, "
     "no English letters, no words, no numbers, no captions, no labels, "
     "no UI text, no logos, no watermarks, no signage. "
-    "Do not draw newspapers or printed headlines. "
+    "Do not draw newspapers, printed headlines or colour codes. "
     "Document and screen shapes are drawn with plain coloured bars "
     "instead of text — no headline, no title bar text, no chart axis labels. "
     "Purely visual illustration with shapes, colors and imagery only."
