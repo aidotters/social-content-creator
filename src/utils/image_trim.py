@@ -19,8 +19,12 @@ from PIL import Image, ImageChops
 # （実測で 8 相当では検出に失敗した）。
 _BG_TOLERANCE = 16
 
-# 行・列を被写体ありと判定する占有率。ごく薄い点や圧縮ノイズを無視する。
-_MIN_OCCUPANCY = 0.005
+# 被写体の範囲を決めるときに、端から切り捨てる量（被写体画素の総量に対する割合）。
+# 生成画像は左上の隅がわずかに暗くなることがあり（Gemini の出力の癖。実測で
+# 31枚中15枚）、単純に「最初に閾値を超えた行」を上端にすると、その暗みを
+# 被写体と見なして外接矩形が画像全体に広がってしまう。
+# 累積で見て外れ値を捨てることで、隅の小さなムラに引きずられなくなる。
+_EDGE_TRIM_QUANTILE = 0.01
 
 # 被写体の周りに残す余白。被写体の長辺に対する比率。
 _MARGIN_RATIO = 0.05
@@ -50,22 +54,52 @@ def _content_mask(im: Image.Image, bg: tuple[int, int, int]) -> Image.Image:
     return largest.point(lambda v: 255 if v > _BG_TOLERANCE else 0)
 
 
+def _span(weights: list[float]) -> tuple[int, int] | None:
+    """重みの並びから、両端の外れ値を捨てた範囲を返す。
+
+    端から順に累積し、全体の _EDGE_TRIM_QUANTILE 分を捨てた位置を境界にする。
+    隅のわずかなムラのような、量の小さい外れ値には引きずられない。
+    """
+    total = sum(weights)
+    if total <= 0:
+        return None
+    cutoff = total * _EDGE_TRIM_QUANTILE
+
+    acc = 0.0
+    start = 0
+    for i, value in enumerate(weights):
+        acc += value
+        if acc > cutoff:
+            start = i
+            break
+
+    acc = 0.0
+    end = len(weights) - 1
+    for i in range(len(weights) - 1, -1, -1):
+        acc += weights[i]
+        if acc > cutoff:
+            end = i
+            break
+
+    return (start, end) if start <= end else None
+
+
 def content_bbox(im: Image.Image) -> tuple[int, int, int, int] | None:
     """被写体の外接矩形を返す。全面が地の色なら None。
 
-    行・列ごとに被写体画素の占有率を見るため、孤立したノイズでは広がらない。
-    占有率は1px幅への縮小（BOX = 平均）で求める。
+    行・列ごとの被写体画素の量を1px幅への縮小（BOX = 平均）で求め、
+    両端の外れ値を落とした範囲を被写体とみなす。
     """
     w, h = im.size
     mask = _content_mask(im, _background_color(im))
 
     row_means = mask.resize((1, h), Image.Resampling.BOX)
     col_means = mask.resize((w, 1), Image.Resampling.BOX)
-    rows = [y for y in range(h) if cast(int, row_means.getpixel((0, y))) / 255 > _MIN_OCCUPANCY]
-    cols = [x for x in range(w) if cast(int, col_means.getpixel((x, 0))) / 255 > _MIN_OCCUPANCY]
-    if not rows or not cols:
+    vertical = _span([cast(int, row_means.getpixel((0, y))) / 255 for y in range(h)])
+    horizontal = _span([cast(int, col_means.getpixel((x, 0))) / 255 for x in range(w)])
+    if vertical is None or horizontal is None:
         return None
-    return (cols[0], rows[0], cols[-1] + 1, rows[-1] + 1)
+    return (horizontal[0], vertical[0], horizontal[1] + 1, vertical[1] + 1)
 
 
 def trim_to_16x9(src: Path | str, dest: Path | str) -> bool:

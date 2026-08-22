@@ -116,6 +116,7 @@ def test_trim_crops_inside_source_and_keeps_edge_object(tmp_path: Path) -> None:
         assert out.size == (1344, 768)
         bbox = content_bbox(out.convert("RGB"))
     assert bbox is not None
-    # 左端の被写体が残っている（切り出しが左へはみ出していれば消える）
-    assert bbox[0] == 0
+    # 左端の被写体が残っている（切り出しが左へはみ出していれば消える）。
+    # 両端の外れ値を落とす都合で数pxは削れるため、厳密な 0 は求めない。
+    assert bbox[0] < 20
     assert bbox[2] - bbox[0] > 100
