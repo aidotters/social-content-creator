@@ -29,7 +29,15 @@ Gemini 2.5 Flash Image（通称 Nanobanana）を使って画像を生成する�
 1. `--prompt` が指定されていない場合、用途（アイキャッチ / SNS投稿 / その他）と画像のイメージをユーザーに確認する
 2. ブログ記事のアイキャッチ用途の場合、記事のタイトル・主題から英語ベースのプロンプトを提案する
    - 日本語より英語のプロンプトの方がNanobananaは安定して動作する
-   - 例: `A cinematic hero image for an AI news blog post titled "..." — minimalistic, futuristic, soft gradient background`
+   - **aidotters.com のアイキャッチなら、プロンプトを手書きせず `build_featured_image_prompt()` を使う**（サイトのトーンに合わせたブランド指示が入る）:
+     ```bash
+     uv run python -c "
+     from src.utils.image_prompt import build_featured_image_prompt
+     print(build_featured_image_prompt(content_type='weekly-ai-news', title='タイトル'))
+     "
+     ```
+   - 手書きする場合もサイトのトーンに合わせる: **白地＋フラットベクターイラスト**、濃紺 `#17325b` / `#1d4e7c` を主役に、中間青 `#6fa3d6` / `#a8cbe8`、ティール `#4fb8a8` / ミント `#8fd8cc`、差し色にイエロー `#f2c94c` / サンド `#f7e2a3`。モチーフは記事内容が伝わる具体物（端末・グラフ・工具・ブロック等）。暗色地・ネオン発光・3D・写実・SF調のHUDは使わない
+   - 画像に文字は入れない。特に**新聞モチーフは見出しの "NEWS" を必ず描かせる**ので避ける
 3. プロンプトをユーザーに確認してもらう
 
 ### ステップ2: アスペクト比の決定

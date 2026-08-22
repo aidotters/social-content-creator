@@ -659,7 +659,7 @@ src/templates/
 
 | 関数 | 説明 |
 |------|------|
-| `build_featured_image_prompt(content_type, title, body_excerpt="")` | コンテンツタイプ別スタイル指示・タイトル・本文抜粋（最大300文字）を組み合わせ、英語のアイキャッチ画像プロンプトを生成 |
+| `build_featured_image_prompt(content_type, title, body_excerpt="")` | コンテンツタイプ別の被写体・構図指示と、サイト共通のブランド配色指示を組み合わせ、英語のアイキャッチ画像プロンプトを生成。`title` / `body_excerpt` は互換のため受け取るがプロンプトには含めない（日本語の文字描画を避けるため） |
 
 ## パフォーマンス最適化
 
