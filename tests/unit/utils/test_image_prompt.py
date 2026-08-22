@@ -75,28 +75,38 @@ def test_brand_directives_in_every_prompt(content_type: ContentType) -> None:
     assert _ANTI_STYLE_DIRECTIVE in prompt
 
 
-def test_brand_palette_hex_values_are_fixed() -> None:
-    """ブランド指示に白地とパレット8色の hex が含まれる。
-
-    #1d4e7c / #6fa3d6 はサイト側 tokens.css（ライト側）の accent と同値。
-    ティール・イエロー系はイラスト専用の拡張色。
-    """
+def test_brand_palette_is_described_by_name() -> None:
+    """パレットが色名の言語記述で指定されている。"""
     prompt = build_featured_image_prompt(
         content_type="weekly-ai-news",
         title="タイトル",
     )
-    for hex_value in (
-        "#ffffff",
-        "#17325b",
-        "#1d4e7c",
-        "#6fa3d6",
-        "#a8cbe8",
-        "#4fb8a8",
-        "#8fd8cc",
-        "#f2c94c",
-        "#f7e2a3",
+    for color in (
+        "white background",
+        "deep navy",
+        "brand navy blue",
+        "medium blue",
+        "light blue",
+        "teal",
+        "mint",
+        "warm yellow",
+        "sand",
     ):
-        assert hex_value in prompt
+        assert color in prompt
+
+
+@pytest.mark.parametrize("content_type", list(_CONTENT_TYPE_STYLES.keys()))
+def test_prompt_contains_no_hex_color_code(content_type: ContentType) -> None:
+    """プロンプトに hex のカラーコードを含めない。
+
+    画像モデルは hex を色として解釈せず、端末の画面などに "6FA32D6" のような
+    崩れた文字列として描画してしまう（weekly-ai-news で複数枚の実測あり）。
+    """
+    prompt = build_featured_image_prompt(
+        content_type=content_type,
+        title="タイトル",
+    )
+    assert "#" not in prompt
 
 
 def test_dark_scifi_style_is_forbidden() -> None:
