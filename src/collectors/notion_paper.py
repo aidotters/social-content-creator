@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 class NotionPaperCollector(NotionBaseCollector):
     """Notion APIでArxiv論文データベースを直接クエリするCollector。"""
 
-    def __init__(
-        self, token: str | None = None, paper_db_id: str | None = None
-    ) -> None:
+    def __init__(self, token: str | None = None, paper_db_id: str | None = None) -> None:
         super().__init__(token=token)
         load_dotenv()
         self._db_id = paper_db_id or os.environ.get("NOTION_PAPER_DB_ID", "")

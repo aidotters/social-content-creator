@@ -93,9 +93,7 @@ class GeminiImageGenerator:
         image.save(str(output_path))
         return output_path
 
-    def _resolve_output_path(
-        self, *, filename: str | None, slug: str | None, prompt: str
-    ) -> Path:
+    def _resolve_output_path(self, *, filename: str | None, slug: str | None, prompt: str) -> Path:
         if filename:
             return self._output_dir / filename
         timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")

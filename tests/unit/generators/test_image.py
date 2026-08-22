@@ -45,9 +45,7 @@ class TestGeminiImageGeneratorInit:
         with pytest.raises(ImageGenerationError, match="GEMINI_API_KEY"):
             GeminiImageGenerator()
 
-    def test_uses_explicit_api_key(
-        self, monkeypatch: pytest.MonkeyPatch, mocker: Any
-    ) -> None:
+    def test_uses_explicit_api_key(self, monkeypatch: pytest.MonkeyPatch, mocker: Any) -> None:
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
         mocker.patch("src.generators.image.genai.Client")
         gen = GeminiImageGenerator(api_key="explicit")
@@ -102,9 +100,7 @@ class TestGenerate:
         assert call_kwargs["config"].response_modalities == ["IMAGE"]
 
     @pytest.mark.asyncio
-    async def test_raises_on_empty_prompt(
-        self, api_key: None, tmp_path: Path, mocker: Any
-    ) -> None:
+    async def test_raises_on_empty_prompt(self, api_key: None, tmp_path: Path, mocker: Any) -> None:
         mocker.patch("src.generators.image.genai.Client")
         gen = GeminiImageGenerator(output_dir=tmp_path)
         with pytest.raises(ImageGenerationError, match="prompt"):
@@ -125,9 +121,7 @@ class TestGenerate:
             await gen.generate("test", filename="x.png")
 
     @pytest.mark.asyncio
-    async def test_wraps_api_exceptions(
-        self, api_key: None, tmp_path: Path, mocker: Any
-    ) -> None:
+    async def test_wraps_api_exceptions(self, api_key: None, tmp_path: Path, mocker: Any) -> None:
         client_mock = MagicMock()
         client_mock.aio.models.generate_content = AsyncMock(
             side_effect=RuntimeError("network down")

@@ -188,6 +188,7 @@ class TestNotionMediumCollector:
 
         request = respx.calls[0].request
         import json
+
         body = json.loads(request.content)
         and_filters = body["filter"]["and"]
         assert len(and_filters) == 2
@@ -206,6 +207,7 @@ class TestNotionMediumCollector:
 
         request = respx.calls[0].request
         import json
+
         body = json.loads(request.content)
         date_filter = body["filter"]["date"]
         assert date_filter["on_or_after"] == "2026-02-15"

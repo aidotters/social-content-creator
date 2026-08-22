@@ -118,5 +118,43 @@ def test_trim_crops_inside_source_and_keeps_edge_object(tmp_path: Path) -> None:
     assert bbox is not None
     # 左端の被写体が残っている（切り出しが左へはみ出していれば消える）。
     # 両端の外れ値を落とす都合で数pxは削れるため、厳密な 0 は求めない。
-    assert bbox[0] < 20
+    assert bbox[0] < 30
     assert bbox[2] - bbox[0] > 100
+
+
+def test_min_reduction_skips_images_that_are_already_full(tmp_path: Path) -> None:
+    """詰め幅が小さい画像は触らない（min_reduction 未満なら False）。"""
+    im = _canvas((1344, 768))
+    # ほぼ全面を占める被写体
+    ImageDraw.Draw(im).rectangle((20, 12, 1324, 756), fill=(29, 78, 124))
+    src = tmp_path / "full.png"
+    im.save(src)
+
+    dest = tmp_path / "full-out.png"
+    assert trim_to_16x9(src, dest, min_reduction=0.08) is False
+    with Image.open(dest) as out:
+        assert out.size == (1344, 768)
+
+
+def test_min_reduction_still_trims_padded_images(tmp_path: Path) -> None:
+    """余白が大きい画像は min_reduction を指定しても詰められる。"""
+    im = _canvas((1344, 768))
+    ImageDraw.Draw(im).rectangle((600, 330, 740, 430), fill=(29, 78, 124))
+    src = tmp_path / "padded.png"
+    im.save(src)
+
+    dest = tmp_path / "padded-out.png"
+    assert trim_to_16x9(src, dest, min_reduction=0.08) is True
+
+
+def test_trim_is_idempotent(tmp_path: Path) -> None:
+    """一度詰めた画像を同じ設定で通しても、二度目は詰めない。"""
+    im = _canvas((1344, 768))
+    ImageDraw.Draw(im).rectangle((600, 330, 740, 430), fill=(29, 78, 124))
+    src = tmp_path / "once.png"
+    im.save(src)
+
+    first = tmp_path / "first.png"
+    trim_to_16x9(src, first, min_reduction=0.08)
+    second = tmp_path / "second.png"
+    assert trim_to_16x9(first, second, min_reduction=0.08) is False

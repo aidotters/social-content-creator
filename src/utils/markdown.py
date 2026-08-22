@@ -117,9 +117,7 @@ def html_to_gutenberg_blocks(html: str) -> str:
             continue
 
         # Unrecognized content — collect until next block element or end
-        next_match = re.search(
-            rf"<(?:{_BLOCK_TAGS}|hr)[\s>/]", remaining[1:]
-        )
+        next_match = re.search(rf"<(?:{_BLOCK_TAGS}|hr)[\s>/]", remaining[1:])
         if next_match:
             end = 1 + next_match.start()
             fragment = remaining[:end].strip()
@@ -183,7 +181,7 @@ def _to_gutenberg_block(tag: str, element: str, attrs: str) -> str:
     if tag == "table":
         return (
             "<!-- wp:table -->\n"
-            f"<figure class=\"wp-block-table\">{element}</figure>\n"
+            f'<figure class="wp-block-table">{element}</figure>\n'
             "<!-- /wp:table -->"
         )
 
