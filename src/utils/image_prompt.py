@@ -209,7 +209,16 @@ def _frame_directive(top: str, bottom: str) -> str:
 _DENSITY_DIRECTIVE = (
     "The objects are drawn large — each roughly a third of the gap's height — and "
     "overlap each other slightly, so they read as one dense cluster rather than "
-    "separate icons with space around them."
+    "separate icons with space around them. "
+    # 手本にした市販イラストでは、ロボットアームが天井のレールから下のコンベアまで
+    # 届いていて、それが縦の空きを埋めていた。上下をつなぐ背の高い要素を入れる。
+    "At least two objects are tall enough to bridge the gap, running from the upper "
+    "structure down to the lower one. Objects that hang from the upper structure do so "
+    "on short lines, sitting close beneath it, so no empty band is left under it. "
+    # 構造そのものがフレーム端から浮くと、そのぶん上下に白帯ができる。
+    "The upper structure's top side touches the top edge of the frame and the lower "
+    "structure's bottom side touches the bottom edge: there is no white space above "
+    "the upper structure or below the lower one."
 )
 
 _COMPOSITION_DIRECTIVE = (

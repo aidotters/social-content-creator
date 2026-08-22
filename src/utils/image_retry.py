@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Protocol
 
 from PIL import Image
 
-from src.utils.image_trim import content_density
+from src.utils.image_trim import content_bbox, content_density
 
 if TYPE_CHECKING:
     from src.generators.image import AspectRatio
@@ -25,7 +25,25 @@ if TYPE_CHECKING:
 # 上限は詰まりすぎてうるさくなる手前。
 _MIN_DENSITY = 0.30
 _MAX_DENSITY = 0.60
+
+# 絵の上端・下端がフレームの端から空いてよい割合。上下の構造がフレーム端から
+# 浮くと、そのぶん白帯が出て絵が宙に浮いて見える。
+_MAX_EDGE_GAP = 0.05
+
 _MAX_ATTEMPTS = 3
+
+
+def _edge_gap(im: Image.Image) -> float:
+    """絵の上端・下端がフレームの端からどれだけ空いているかを返す（高さ比）。
+
+    上下のうち大きいほうを返す。左右を見ないのは、上下の構造が横いっぱいに
+    伸びる構図なので、横の空きはこの指標では起きないため。
+    """
+    bbox = content_bbox(im)
+    if bbox is None:
+        return 1.0
+    height = im.height
+    return max(bbox[1], height - bbox[3]) / height
 
 
 class _ImageGenerator(Protocol):
@@ -50,12 +68,19 @@ async def generate_with_density(
     slug: str | None = None,
     min_density: float = _MIN_DENSITY,
     max_density: float = _MAX_DENSITY,
+    max_edge_gap: float = _MAX_EDGE_GAP,
     max_attempts: int = _MAX_ATTEMPTS,
 ) -> tuple[Path, float, int]:
-    """密度が範囲に入るまで引き直しつつ生成する。
+    """絵が薄い／上下が空いている間は引き直しつつ生成する。
 
-    範囲に入らないまま試行回数を使い切った場合は、いちばん範囲の中心に
-    近かった1枚を返す。生成に失敗した場合の例外はそのまま呼び出し元へ通す。
+    条件を満たさないまま試行回数を使い切った場合は、いちばん密度が
+    範囲の中心に近かった1枚を返す。生成に失敗した場合の例外はそのまま
+    呼び出し元へ通す。
+
+    Args:
+        max_edge_gap: 絵の上端・下端がフレームの端からどれだけ空いてよいか
+            （高さに対する比率）。上下の構造がフレーム端から浮くと、
+            そのぶん白帯が出て絵が宙に浮いて見える。
 
     Returns:
         (画像パス, その画像の密度, 実際に生成した枚数)
@@ -68,9 +93,11 @@ async def generate_with_density(
             prompt=prompt, aspect_ratio=aspect_ratio, filename=filename, slug=slug
         )
         with Image.open(path) as opened:
-            density = content_density(opened.convert("RGB"))
+            image = opened.convert("RGB")
+            density = content_density(image)
+            edge_gap = _edge_gap(image)
 
-        if min_density <= density <= max_density:
+        if min_density <= density <= max_density and edge_gap <= max_edge_gap:
             # 前の試行で控えた1枚が残っていると、出力先にゴミが残る
             if best is not None:
                 best[0].unlink(missing_ok=True)
