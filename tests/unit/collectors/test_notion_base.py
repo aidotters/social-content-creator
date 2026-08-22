@@ -52,11 +52,7 @@ class TestNotionBaseCollector:
 
     def test_extract_rich_text(self) -> None:
         """rich_textプロパティを抽出できる。"""
-        props = {
-            "Summary": {
-                "rich_text": [{"plain_text": "テスト概要"}]
-            }
-        }
+        props = {"Summary": {"rich_text": [{"plain_text": "テスト概要"}]}}
         assert NotionBaseCollector._extract_rich_text(props, "Summary") == "テスト概要"
 
     def test_extract_url(self) -> None:

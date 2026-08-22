@@ -128,3 +128,32 @@ def test_subject_string_for_each_content_type(content_type: ContentType) -> None
         title="サンプルタイトル",
     )
     assert _CONTENT_TYPE_SUBJECTS[content_type] in prompt
+
+
+@pytest.mark.parametrize("content_type", list(_CONTENT_TYPE_STYLES.keys()))
+def test_frame_structures_in_every_prompt(content_type: ContentType) -> None:
+    """全 content_type で、上下の水平構造の指示がプロンプトに含まれる。
+
+    白地にオブジェクトを浮かせただけだと上下の境目が無く絵が宙に浮くため、
+    タイプごとの構造（レール・書棚・コンベア等）を必ず入れる。
+    """
+    from src.utils.image_prompt import _CONTENT_TYPE_FRAMES
+
+    prompt = build_featured_image_prompt(content_type=content_type, title="タイトル")
+    top, bottom = _CONTENT_TYPE_FRAMES[content_type]
+    assert top in prompt
+    assert bottom in prompt
+    assert "Framing:" in prompt
+
+
+def test_every_content_type_has_a_frame() -> None:
+    """フレーム定義が全 content_type ぶん揃っている。"""
+    from src.utils.image_prompt import _CONTENT_TYPE_FRAMES
+
+    assert set(_CONTENT_TYPE_FRAMES) == set(_CONTENT_TYPE_STYLES)
+
+
+def test_prompt_asks_for_dense_composition() -> None:
+    """絵が薄くならないよう、大きさと重なりの指示が入っている。"""
+    prompt = build_featured_image_prompt(content_type="weekly-ai-news", title="タイトル")
+    assert "overlap each other slightly" in prompt

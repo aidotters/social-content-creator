@@ -136,13 +136,93 @@ _NO_TEXT_DIRECTIVE = (
     "Purely visual illustration with shapes, colors and imagery only."
 )
 
-# 構図指示。地は白なのでオブジェクトの周りに余白が出るのが正しいが、
-# 放っておくと絵が小さくまとまり、hero 枠の中で寂しくなる。
-# 「白地は残す」と「絵は大きく」を両立させるため、占有率を明示する。
+# 上下端に置く水平構造（上から吊るすもの / 下で受けるもの）。
+#
+# 白地にオブジェクトを浮かせただけだと、上下の境目が無く絵が宙に浮いて見える。
+# 参考にした元のアイキャッチ（Vexels の Factory Automation / Business Workflow
+# Automation）は、上端のレールと下端のコンベアが絵の枠を作っていた。
+#
+# 構造そのものは共通のルール（濃紺・細い・端から端まで）で揃え、それが何で
+# あるかだけを記事タイプごとに変える。これで統一感を保ちつつ内容に合う絵になる。
+# 無地の帯にすると単なる罫線に見えるため、必ず等間隔で反復するディテールを持たせる。
+_CONTENT_TYPE_FRAMES: dict[ContentType, tuple[str, str]] = {
+    "weekly-ai-news": (
+        "a ruler strip with evenly spaced tick marks",
+        "a timeline rail with large round station markers at even intervals",
+    ),
+    # 上の棚板を上端ぴったりに置くと、その上に立つ本がフレーム外で切れる。
+    # 少し下げて、本が収まる高さを空ける。
+    "paper-review": (
+        "an upper bookshelf plank set a little below the top edge, lined with upright "
+        "books and box files standing on it",
+        "a bookshelf plank along the very bottom edge, lined with upright books " "and bookends",
+    ),
+    "project-intro": (
+        "an overhead rail with evenly spaced hooks, each carrying a hanging part",
+        "a conveyor belt with a row of evenly spaced rollers",
+    ),
+    "tool-tips": (
+        "a pegboard strip with evenly spaced holes and small hooks",
+        "a desk surface with a row of drawer handles along its front edge",
+    ),
+    "market-analysis": (
+        "an overhead rail with evenly spaced screens hanging from it, each showing "
+        "a small chart",
+        "a trading desk counter with evenly spaced panel seams along its front",
+    ),
+    "ml-practice": (
+        "a cable tray with evenly spaced clamps holding bundled cables",
+        "a platform with evenly spaced pedestals joined left to right by arrows",
+    ),
+    "cv": (
+        "a scan strip with evenly spaced measurement notches and corner brackets",
+        "a graph-paper base with a fine even grid",
+    ),
+    "feature": (
+        "a lighting bar with evenly spaced round lamps",
+        "a stage floor with evenly spaced plank seams and small footlights",
+    ),
+}
+
+
+def _frame_directive(top: str, bottom: str) -> str:
+    """上下の水平構造と、その間の埋め方を指示する文を組み立てる。
+
+    指示を盛るほど良くなるわけではない。「余白を作るな」と重ねて書くと、
+    構造だけが太って中身が薄くなる挙動を実測しているので、ここは短く保つ。
+    """
+    return (
+        f"Framing: along the very top edge, {top}. Along the very bottom edge, {bottom}. "
+        "Both are deep navy, slim (about 7 percent of the frame height), and run "
+        "unbroken from the very left edge to the very right edge. Each carries its "
+        "repeating detail across its whole length; neither is a plain solid bar. "
+        "Some objects hang from the upper one, the rest rest on the lower one, and "
+        "together they fill the space between the two structures from side to side."
+    )
+
+
+# 絵の詰まり具合。手本にした市販のフラットイラストは、要素が大きく少し重なり
+# 合っていて隙間が少ない（塗られた画素の割合で 39% / 41%）。
+# 何も言わないと 20% 台の薄い絵になりやすいので、大きさと重なりを明示する。
+# ただし指示だけでは安定しない（実測で 43% と 13% に振れた）ため、
+# 生成側で密度を測って引き直す（src/utils/image_retry.py）。
+_DENSITY_DIRECTIVE = (
+    "The objects are drawn large — each roughly a third of the gap's height — and "
+    "overlap each other slightly, so they read as one dense cluster rather than "
+    "separate icons with space around them. "
+    # 手本にした市販イラストでは、ロボットアームが天井のレールから下のコンベアまで
+    # 届いていて、それが縦の空きを埋めていた。上下をつなぐ背の高い要素を入れる。
+    "At least two objects are tall enough to bridge the gap, running from the upper "
+    "structure down to the lower one. Objects that hang from the upper structure do so "
+    "on short lines, sitting close beneath it, so no empty band is left under it. "
+    # 構造そのものがフレーム端から浮くと、そのぶん上下に白帯ができる。
+    "The upper structure's top side touches the top edge of the frame and the lower "
+    "structure's bottom side touches the bottom edge: there is no white space above "
+    "the upper structure or below the lower one."
+)
+
 _COMPOSITION_DIRECTIVE = (
-    "Composition: the objects form one connected group, spread horizontally across "
-    "the 16:9 frame and occupying roughly 85 percent of its width and height, "
-    "with one clear focal object. The remaining white background reads as even margin. "
+    "The scene fills the entire 16:9 frame edge to edge. "
     "No border, no inner frame, no letterbox bars, no background panel or card."
 )
 
@@ -165,6 +245,7 @@ def build_featured_image_prompt(
     """
     style = _CONTENT_TYPE_STYLES[content_type]
     subject = _CONTENT_TYPE_SUBJECTS[content_type]
+    top, bottom = _CONTENT_TYPE_FRAMES[content_type]
 
     # 日本語の title / body_excerpt はプロンプトに含めない。
     # 画像モデルがそれらを文字として描画し、崩れた日本語が混入するため、
@@ -173,6 +254,8 @@ def build_featured_image_prompt(
         f"Featured illustration for an AI engineering blog post: {subject}.",
         _BRAND_STYLE_DIRECTIVE,
         f"Layout: {style}.",
+        _frame_directive(top, bottom),
+        _DENSITY_DIRECTIVE,
         _ANTI_STYLE_DIRECTIVE,
         _NO_TEXT_DIRECTIVE,
         _COMPOSITION_DIRECTIVE,

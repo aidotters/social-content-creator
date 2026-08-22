@@ -54,7 +54,9 @@ social-content-creator/
 │   ├── utils/                  # 共通ユーティリティ
 │   │   ├── __init__.py
 │   │   ├── markdown.py
-│   │   └── image_prompt.py
+│   │   ├── image_prompt.py
+│   │   ├── image_retry.py
+│   │   └── image_trim.py
 │   └── errors.py               # カスタムエラークラス
 ├── tests/
 │   ├── conftest.py             # テストフィクスチャ
@@ -79,7 +81,9 @@ social-content-creator/
 │   │   │   └── test_x.py
 │   │   ├── utils/
 │   │   │   ├── test_markdown.py
-│   │   │   └── test_image_prompt.py
+│   │   │   ├── test_image_prompt.py
+│   │   │   ├── test_image_retry.py
+│   │   │   └── test_image_trim.py
 │   │   └── templates/
 │   │       └── test_templates.py
 │   └── integration/
@@ -251,6 +255,8 @@ publishers/
 **配置ファイル**:
 - `markdown.py`: Markdown処理ユーティリティ
 - `image_prompt.py`: アイキャッチ画像生成プロンプト組み立て
+- `image_retry.py`: 生成した絵が薄ければ引き直す（密度を測って判定）
+- `image_trim.py`: 画像の詰まり具合の測定（余白のトリムも可能だが通常フローでは未使用）
 
 **命名規則**:
 - ファイル名: snake_case、機能を表す名詞

@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 class NotionNewsCollector(NotionBaseCollector):
     """Notion APIでGoogle Alertニュースデータベースを直接クエリするCollector。"""
 
-    def __init__(
-        self, token: str | None = None, news_db_id: str | None = None
-    ) -> None:
+    def __init__(self, token: str | None = None, news_db_id: str | None = None) -> None:
         super().__init__(token=token)
         load_dotenv()
         self._db_id = news_db_id or os.environ.get("NOTION_NEWS_DB_ID", "")

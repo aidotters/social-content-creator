@@ -79,7 +79,6 @@ class TestBlogPost:
             )
             assert post.content_type == ct
 
-
     def test_create_with_subtitle(self) -> None:
         """subtitle付きで生成できる。"""
         post = BlogPost(

@@ -26,9 +26,7 @@ def _make_page(
             "Summary": {"rich_text": [{"plain_text": summary}]},
             "Snippet": {"rich_text": [{"plain_text": "snippet text"}]},
             "Source": {"rich_text": [{"plain_text": source}]},
-            "Tags": {
-                "multi_select": [{"name": t} for t in (tags or ["AI"])]
-            },
+            "Tags": {"multi_select": [{"name": t} for t in (tags or ["AI"])]},
             "URL": {"url": url},
             "Date": {"date": {"start": date}},
         },
@@ -179,6 +177,7 @@ class TestNotionNewsCollector:
 
         request = respx.calls[0].request
         import json
+
         body = json.loads(request.content)
         assert body["filter"]["property"] == "Date"
         assert "on_or_after" in body["filter"]["date"]
@@ -195,6 +194,7 @@ class TestNotionNewsCollector:
 
         request = respx.calls[0].request
         import json
+
         body = json.loads(request.content)
         and_filters = body["filter"]["and"]
         assert len(and_filters) == 2
@@ -213,6 +213,7 @@ class TestNotionNewsCollector:
 
         request = respx.calls[0].request
         import json
+
         body = json.loads(request.content)
         assert body["filter"]["property"] == "Date"
         assert body["filter"]["date"]["on_or_after"] == "2026-02-15"
@@ -243,5 +244,6 @@ class TestNotionNewsCollector:
 
         request = respx.calls[0].request
         import json
+
         body = json.loads(request.content)
         assert body["sorts"] == [{"property": "Date", "direction": "descending"}]
