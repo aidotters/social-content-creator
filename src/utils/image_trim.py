@@ -1,0 +1,113 @@
+"""生成画像の余白を詰めて 16:9 に収め直すユーティリティ。
+
+画像モデルはフレームいっぱいに描くのが苦手で、被写体を中央に小さくまとめ、
+周囲に広い余白を残す。「フレームの端まで埋めろ」と指示しても安定しない
+（2026-08-22 に複数の構図指示で試行し、いずれも上下または左右が空いた）。
+プロンプトで粘るより、描かせたあとに余白を落とすほうが確実なため、
+生成とサイトへの配置の間にこの処理を挟む。
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import cast
+
+from PIL import Image, ImageChops
+
+# 地の色とみなす差の上限（RGB各チャンネルの最大差）。生成画像の地には微妙な
+# ムラがあり、小さすぎるとムラを被写体と誤検出して余白が詰まらない
+# （実測で 8 相当では検出に失敗した）。
+_BG_TOLERANCE = 16
+
+# 行・列を被写体ありと判定する占有率。ごく薄い点や圧縮ノイズを無視する。
+_MIN_OCCUPANCY = 0.005
+
+# 被写体の周りに残す余白。被写体の長辺に対する比率。
+_MARGIN_RATIO = 0.05
+
+_TARGET_SIZE = (1344, 768)
+_ASPECT = 16 / 9
+
+
+def _background_color(im: Image.Image) -> tuple[int, int, int]:
+    """四隅から地の色を推定する。中央値なので隅に被写体が掛かっても耐える。"""
+    w, h = im.size
+    corners = [
+        cast(tuple[int, int, int], im.getpixel(xy))
+        for xy in ((1, 1), (w - 2, 1), (1, h - 2), (w - 2, h - 2))
+    ]
+    channels = zip(*corners, strict=True)
+    r, g, b = (sorted(c)[len(c) // 2] for c in channels)
+    return (r, g, b)
+
+
+def _content_mask(im: Image.Image, bg: tuple[int, int, int]) -> Image.Image:
+    """地の色と異なる画素を 255 にした2値マスクを返す。"""
+    diff = ImageChops.difference(im, Image.new("RGB", im.size, bg))
+    red, green, blue = diff.split()
+    # 輝度変換だと地と明度が近い色を取り落とすので、チャンネルごとの最大差を使う
+    largest = ImageChops.lighter(ImageChops.lighter(red, green), blue)
+    return largest.point(lambda v: 255 if v > _BG_TOLERANCE else 0)
+
+
+def content_bbox(im: Image.Image) -> tuple[int, int, int, int] | None:
+    """被写体の外接矩形を返す。全面が地の色なら None。
+
+    行・列ごとに被写体画素の占有率を見るため、孤立したノイズでは広がらない。
+    占有率は1px幅への縮小（BOX = 平均）で求める。
+    """
+    w, h = im.size
+    mask = _content_mask(im, _background_color(im))
+
+    row_means = mask.resize((1, h), Image.Resampling.BOX)
+    col_means = mask.resize((w, 1), Image.Resampling.BOX)
+    rows = [y for y in range(h) if cast(int, row_means.getpixel((0, y))) / 255 > _MIN_OCCUPANCY]
+    cols = [x for x in range(w) if cast(int, col_means.getpixel((x, 0))) / 255 > _MIN_OCCUPANCY]
+    if not rows or not cols:
+        return None
+    return (cols[0], rows[0], cols[-1] + 1, rows[-1] + 1)
+
+
+def trim_to_16x9(src: Path | str, dest: Path | str) -> bool:
+    """余白を詰めて 16:9 に組み直し、dest へ保存する。
+
+    被写体が既にフレームを満たしている場合は、リサイズだけして保存する。
+
+    Returns:
+        余白を詰めた場合 True、詰める余地がなかった場合 False。
+    """
+    src, dest = Path(src), Path(dest)
+    with Image.open(src) as opened:
+        im = opened.convert("RGB")
+        src_w, src_h = im.size
+        bbox = content_bbox(im)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+
+        if bbox is None:
+            im.resize(_TARGET_SIZE, Image.Resampling.LANCZOS).save(dest)
+            return False
+
+        left, top, right, bottom = bbox
+        obj_w, obj_h = right - left, bottom - top
+        margin = int(max(obj_w, obj_h) * _MARGIN_RATIO)
+        target_w, target_h = obj_w + margin * 2, obj_h + margin * 2
+
+        # 被写体を切らずに 16:9 へ。足りない側を広げる。
+        if target_w / target_h < _ASPECT:
+            target_w = round(target_h * _ASPECT)
+        else:
+            target_h = round(target_w / _ASPECT)
+
+        # 切り出しは必ず元画像の内側で行う。外側を地の色で埋めると、元画像の
+        # 縁にあるわずかな色ムラとの境目が継ぎ目の線になって出る。
+        # 元画像も 16:9 なので、上限まで広げてもアスペクト比は保たれる。
+        if target_w > src_w or target_h > src_h:
+            target_w, target_h = src_w, src_h
+
+        cx, cy = (left + right) // 2, (top + bottom) // 2
+        x = min(max(cx - target_w // 2, 0), src_w - target_w)
+        y = min(max(cy - target_h // 2, 0), src_h - target_h)
+
+        cropped = im.crop((x, y, x + target_w, y + target_h))
+        cropped.resize(_TARGET_SIZE, Image.Resampling.LANCZOS).save(dest)
+        return (target_w, target_h) != (src_w, src_h)
