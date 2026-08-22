@@ -30,9 +30,11 @@ _CONTENT_TYPE_SUBJECTS: dict[ContentType, str] = {
         "a market dashboard scene of bar charts, a rising line graph, "
         "coin stacks, pie chart and arrow indicators on floating panels"
     ),
+    # 「training a model」と書くと画面に "training model" の文字が描かれる。
+    # 動作ではなく物として書く。
     "ml-practice": (
         "a data workshop scene of a node graph, scatter plot, gears, "
-        "database cylinders and a laptop training a model"
+        "database cylinders and a laptop showing a bar chart"
     ),
     "cv": (
         "a computer vision scene of a camera and lens, framed detection boxes "
@@ -69,16 +71,16 @@ _CONTENT_TYPE_STYLES: dict[ContentType, str] = {
         "one chart clearly larger than the rest as the focal point"
     ),
     "ml-practice": (
-        "objects connected by simple lines into a flow from left to right, "
-        "a sense of pipeline and process"
+        "objects connected by simple lines into a flow, grouped as a compact "
+        "cluster on two levels rather than a single straight row"
     ),
     "cv": (
         "one main subject framed at the centre with smaller framed objects around it, "
         "a sense of things being detected"
     ),
     "feature": (
-        "one large dominant object at the centre with smaller objects orbiting it, "
-        "confident and poster-like"
+        "one large dominant object at the centre with smaller objects spread out "
+        "to its left and right, confident and poster-like"
     ),
 }
 
