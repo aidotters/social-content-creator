@@ -71,6 +71,9 @@ async def generate_with_density(
             density = content_density(opened.convert("RGB"))
 
         if min_density <= density <= max_density:
+            # 前の試行で控えた1枚が残っていると、出力先にゴミが残る
+            if best is not None:
+                best[0].unlink(missing_ok=True)
             return (path, density, attempt)
 
         # 引き直すと filename 指定時は同じパスを上書きするため、

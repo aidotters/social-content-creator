@@ -306,6 +306,7 @@ status: confirmed
    from src.generators.blog_post import BlogPostGenerator
    from src.generators.image import GeminiImageGenerator
    from src.utils.image_prompt import build_featured_image_prompt
+   from src.utils.image_retry import generate_with_density
    from src.errors import ImageGenerationError
 
    gen_post = BlogPostGenerator()
@@ -317,9 +318,11 @@ status: confirmed
    )
    try:
        gen_image = GeminiImageGenerator()
-       image_path = asyncio.run(gen_image.generate(
-           prompt=prompt, aspect_ratio='16:9', slug=post.slug,
+       # 絵が薄いと白地に浮いて見えるので、密度を測って薄ければ引き直す
+       image_path, density, attempts = asyncio.run(generate_with_density(
+           gen_image, prompt, aspect_ratio='16:9', slug=post.slug,
        ))
+       print(f'IMAGE_DENSITY={density:.0%} ATTEMPTS={attempts}')
        print(f'IMAGE_PATH={image_path}')
    except ImageGenerationError as e:
        # 画像生成失敗時は警告ログを出して画像なしで投稿継続

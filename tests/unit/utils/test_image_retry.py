@@ -61,6 +61,24 @@ async def test_retries_while_too_sparse(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "densities",
+    [
+        [0.40],  # 一発で成功
+        [0.10, 0.45],  # 引き直して成功
+        [0.05, 0.20, 0.02],  # 一度も範囲に入らない
+    ],
+)
+async def test_no_leftover_files(tmp_path: Path, densities: list[float]) -> None:
+    """どの結末でも、控え用のファイルを出力先に残さない。"""
+    gen = _FakeGenerator(densities, tmp_path)
+    path, _, _ = await generate_with_density(
+        gen, "prompt", filename="x.png", min_density=0.28, max_density=0.60
+    )
+    assert [p.name for p in tmp_path.iterdir()] == [path.name]
+
+
+@pytest.mark.asyncio
 async def test_keeps_best_when_never_in_range(tmp_path: Path) -> None:
     """一度も範囲に入らなければ、範囲の中心に最も近い1枚を残す。"""
     gen = _FakeGenerator([0.05, 0.20, 0.02], tmp_path)
