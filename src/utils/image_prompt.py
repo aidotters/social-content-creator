@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from src.models.blog_post import ContentType
 
-_BODY_EXCERPT_MAX_LENGTH = 300
-
 # 各記事タイプの被写体。
 # 日本語タイトル・本文をプロンプトに渡すと画像モデルが文字を描画しようと
 # するため、テキスト誘発を避ける目的でこの英語の記述のみを被写体に使う。
@@ -144,8 +142,9 @@ def build_featured_image_prompt(
 
     Args:
         content_type: 記事タイプ。各タイプ固有の被写体・構図指示が選択される。
-        title: 記事タイトル。プロンプト内で被写体テーマとして利用する。
-        body_excerpt: 本文冒頭。最大300文字まで使用し、コンテキストを補強する。
+        title: 記事タイトル。呼び出し側の互換のため受け取るが、プロンプトには
+            含めない（画像モデルが日本語を文字として描画してしまうため）。
+        body_excerpt: 本文冒頭。title と同じ理由でプロンプトには含めない。
 
     Returns:
         英語ベースの画像生成プロンプト文字列。
