@@ -61,8 +61,11 @@ Thumbs.db
 
 .playwright-mcp/
 
-docs/drafts/
-docs/drafts/weekly-ai-news/
+# docs/drafts/ は Markdown だけ追跡する（画像・.DS_Store は追跡しない）
+# 方針: aidotters-company-agent/outputs/drafts/README.md（2026-09-11 から）
+docs/drafts/**
+!docs/drafts/**/
+!docs/drafts/**/*.md
 !docs/drafts/.gitkeep
 
 docs/posts/
