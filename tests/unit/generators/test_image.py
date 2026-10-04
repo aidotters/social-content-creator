@@ -42,6 +42,7 @@ def api_key(monkeypatch: pytest.MonkeyPatch) -> None:
 class TestGeminiImageGeneratorInit:
     def test_raises_when_api_key_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+        monkeypatch.setattr("src.generators.image.load_dotenv", lambda: None)
         with pytest.raises(ImageGenerationError, match="GEMINI_API_KEY"):
             GeminiImageGenerator()
 
