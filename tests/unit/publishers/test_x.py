@@ -200,8 +200,10 @@ class TestPublish:
             return_value=httpx.Response(402, json={"title": "CreditsDepleted"})
         )
 
-        with pytest.raises(XPublishError, match="クレジットが不足"):
+        with pytest.raises(XPublishError, match="クレジットが不足") as exc_info:
             await publisher.publish(blog_post, text="テスト")
+        # 402 の理由は応答本文にしか無いので、メッセージに含める
+        assert "CreditsDepleted" in str(exc_info.value)
 
     @respx.mock
     async def test_publish_network_error_retry(
