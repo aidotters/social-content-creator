@@ -10,7 +10,7 @@ description: 記事の紹介をX（Twitter）に投稿するスキル。docs/pos
 ## コマンド形式
 
 ```
-/publish-to-x [<article-path>] [--thread]
+/publish-to-x [<article-path>] [--thread] [--image <path> ...]
 ```
 
 ## 引数
@@ -19,6 +19,7 @@ description: 記事の紹介をX（Twitter）に投稿するスキル。docs/pos
 |------|:----:|------|
 | `<article-path>` | - | 記事ファイルのパス（docs/posts/ または docs/drafts/ 配下） |
 | `--thread` | - | スレッド形式で投稿する |
+| `--image <path>` | - | 添付する画像（PNG / JPEG / WebP / GIF・4枚まで・各5MBまで）。1ツイート投稿のときだけ使える |
 
 ## 実行フロー
 
@@ -151,8 +152,12 @@ post = BlogPost(
     wordpress_url='${WORDPRESS_URL}' if '${WORDPRESS_URL}' else None,
 )
 
-# 1ツイート投稿の場合
-result = asyncio.run(pub.publish(post, text='''${TWEET_TEXT}'''))
+# 1ツイート投稿の場合（画像があれば image_paths に渡す。無ければ省く）
+result = asyncio.run(pub.publish(
+    post,
+    text='''${TWEET_TEXT}''',
+    image_paths=[${IMAGE_PATHS}],  # 例: ['/Users/tak/Downloads/chart.png']
+))
 
 # スレッド投稿の場合
 # texts = ['''${TWEET_1}''', '''${TWEET_2}''', ...]
@@ -169,6 +174,11 @@ else:
 
 投稿成功時:
 - ツイートURLをユーザーに表示する
+
+画像について:
+- 画像はツイートより先にアップロードする。**アップロードが1枚でも失敗したらツイートしない**（画像の無い投稿が出てしまうのを防ぐ）
+- 枚数・形式・サイズは送る前に検査するので、不正な画像があれば何も送らずに止まる
+- 本文で「この図」と言うなら画像は必須。画像なしで出すときは本文を直す
 
 投稿失敗時:
 - エラー内容を表示し、`.env` のOAuth 1.0a認証情報の設定を確認するよう案内する

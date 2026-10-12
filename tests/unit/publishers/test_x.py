@@ -1,6 +1,8 @@
 """XPublisherのテスト。"""
 
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
 import httpx
 import pytest
@@ -9,7 +11,7 @@ import respx
 
 from src.errors import XPublishError
 from src.models.blog_post import BlogPost
-from src.publishers.x import MAX_TWEET_LENGTH, X_API_BASE, XPublisher
+from src.publishers.x import MAX_IMAGE_BYTES, MAX_TWEET_LENGTH, X_API_BASE, XPublisher
 
 
 @pytest.fixture
@@ -389,3 +391,126 @@ class TestPostTweetRetry:
         result = await publisher._post_tweet("テスト")
 
         assert result["data"] == {"id": "net-ok"}  # type: ignore[comparison-overlap]
+
+
+def _png(tmp_path: Path, name: str = "chart.png", size: int = 64) -> Path:
+    path = tmp_path / name
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\0" * size)
+    return path
+
+
+class TestPublishWithImages:
+    """画像つき投稿のテスト。"""
+
+    @respx.mock
+    async def test_upload_then_tweet_with_media_ids(
+        self, publisher: XPublisher, blog_post: BlogPost, tmp_path: Path
+    ) -> None:
+        """画像をアップロードし、返った media id をツイートに付ける。"""
+        upload = respx.post(f"{X_API_BASE}/media/upload").mock(
+            return_value=httpx.Response(200, json={"data": {"id": "m1"}})
+        )
+        tweet = respx.post(f"{X_API_BASE}/tweets").mock(return_value=_tweet_response("555"))
+
+        result = await publisher.publish(blog_post, text="図つき", image_paths=[_png(tmp_path)])
+
+        assert result.url == "https://x.com/i/status/555"
+        assert upload.call_count == 1
+        sent = upload.calls[0].request
+        assert sent.headers["Content-Type"].startswith("multipart/form-data")
+        assert sent.headers["Authorization"].startswith("OAuth ")
+        assert b'name="media"; filename="chart.png"' in sent.content
+        assert b"tweet_image" in sent.content
+        body = json.loads(tweet.calls[0].request.content)
+        assert body == {"text": "図つき", "media": {"media_ids": ["m1"]}}
+
+    @respx.mock
+    async def test_no_images_keeps_payload(
+        self, publisher: XPublisher, blog_post: BlogPost
+    ) -> None:
+        """画像が無ければアップロードせず、従来どおり text だけを送る。"""
+        upload = respx.post(f"{X_API_BASE}/media/upload")
+        tweet = respx.post(f"{X_API_BASE}/tweets").mock(return_value=_tweet_response("1"))
+
+        await publisher.publish(blog_post, text="文字だけ")
+
+        assert upload.call_count == 0
+        assert json.loads(tweet.calls[0].request.content) == {"text": "文字だけ"}
+
+    @respx.mock
+    async def test_upload_failure_does_not_tweet(
+        self, publisher: XPublisher, blog_post: BlogPost, tmp_path: Path
+    ) -> None:
+        """アップロードに失敗したらツイートしない（画像の無い投稿を出さない）。"""
+        respx.post(f"{X_API_BASE}/media/upload").mock(
+            return_value=httpx.Response(400, json={"detail": "bad media"})
+        )
+        tweet = respx.post(f"{X_API_BASE}/tweets")
+
+        with pytest.raises(XPublishError, match="画像のアップロードに失敗"):
+            await publisher.publish(blog_post, text="図つき", image_paths=[_png(tmp_path)])
+
+        assert tweet.call_count == 0
+
+    @respx.mock
+    async def test_upload_retries_once_on_server_error(
+        self, publisher: XPublisher, tmp_path: Path
+    ) -> None:
+        """5xx は1回だけ再試行する。"""
+        route = respx.post(f"{X_API_BASE}/media/upload")
+        route.side_effect = [
+            httpx.Response(503),
+            httpx.Response(200, json={"data": {"id": "m2"}}),
+        ]
+
+        assert await publisher._upload_image(_png(tmp_path)) == "m2"
+
+    @respx.mock
+    async def test_upload_response_without_id(
+        self, publisher: XPublisher, tmp_path: Path
+    ) -> None:
+        """応答に id が無ければ失敗にする。"""
+        respx.post(f"{X_API_BASE}/media/upload").mock(
+            return_value=httpx.Response(200, json={"data": {}})
+        )
+
+        with pytest.raises(XPublishError, match="media id"):
+            await publisher._upload_image(_png(tmp_path))
+
+
+class TestValidateImages:
+    """画像の事前検査のテスト（どれもネットワークに出る前に止まる）。"""
+
+    def test_too_many(self, tmp_path: Path) -> None:
+        paths = [_png(tmp_path, f"{i}.png") for i in range(5)]
+        with pytest.raises(ValueError, match="4枚まで"):
+            XPublisher.validate_images(list(paths))
+
+    def test_missing_file(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="見つかりません"):
+            XPublisher.validate_images([tmp_path / "none.png"])
+
+    def test_unsupported_type(self, tmp_path: Path) -> None:
+        path = tmp_path / "chart.svg"
+        path.write_text("<svg/>")
+        with pytest.raises(ValueError, match="対応していない"):
+            XPublisher.validate_images([path])
+
+    def test_too_large(self, tmp_path: Path) -> None:
+        path = _png(tmp_path, size=MAX_IMAGE_BYTES)
+        with pytest.raises(ValueError, match="大きすぎ"):
+            XPublisher.validate_images([path])
+
+    async def test_invalid_image_blocks_before_upload(
+        self, publisher: XPublisher, blog_post: BlogPost, mocker: pytest_mock.MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        """2枚目が不正なら1枚目もアップロードしない。"""
+        upload = mocker.patch.object(publisher, "_upload_image")
+        bad = tmp_path / "x.bmp"
+        bad.write_bytes(b"BM")
+        with pytest.raises(ValueError):
+            await publisher.publish(
+                blog_post, text="図", image_paths=[_png(tmp_path), bad]
+            )
+        upload.assert_not_called()

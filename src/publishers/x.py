@@ -2,9 +2,11 @@
 
 import asyncio
 import logging
+import mimetypes
 import os
 import re
 import typing
+from pathlib import Path
 
 import httpx
 from authlib.integrations.httpx_client import OAuth1Auth
@@ -37,6 +39,17 @@ _WEIGHTED_RANGES = (
 
 _URL_WEIGHT = 23  # t.co短縮URLの固定長
 
+# 画像の添付（v2 の media/upload・1リクエストで送る simple upload）
+MAX_IMAGES = 4
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+_IMAGE_TYPES = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+}
+
 
 class _OAuth1AuthJsonFix(OAuth1Auth):  # type: ignore[misc]
     """authlib の OAuth1Auth は JSON body を署名時に空にしてしまうバグがある。
@@ -44,6 +57,7 @@ class _OAuth1AuthJsonFix(OAuth1Auth):  # type: ignore[misc]
     OAuth 1.0a の仕様では JSON body は署名に含めないのが正しいが、
     authlib は署名後に body 自体も空にリセットしてしまう。
     このサブクラスでは元の body を保持するよう修正する。
+    画像アップロードの multipart body も同じ理由で必要（署名に含めず、本体は送る）。
     """
 
     def auth_flow(
@@ -141,11 +155,14 @@ class XPublisher:
         self,
         text: str,
         reply_to: str | None = None,
+        media_ids: list[str] | None = None,
     ) -> dict[str, object]:
         """1件のツイートを投稿する（内部メソッド）。"""
         payload: dict[str, object] = {"text": text}
         if reply_to:
             payload["reply"] = {"in_reply_to_tweet_id": reply_to}
+        if media_ids:
+            payload["media"] = {"media_ids": media_ids}
 
         last_error: Exception | None = None
         for attempt in range(2):
@@ -228,17 +245,109 @@ class XPublisher:
 
         raise XPublishError(message=f"通信エラー: {last_error}") from last_error
 
+    @staticmethod
+    def validate_images(image_paths: list[str | Path]) -> list[Path]:
+        """添付する画像の枚数・形式・サイズを投稿の前に確かめる。
+
+        途中で失敗して画像だけがアップロード済みになるのを避けるため、
+        1枚もアップロードしないうちに全部を検査する。
+        """
+        if len(image_paths) > MAX_IMAGES:
+            raise ValueError(f"画像は{MAX_IMAGES}枚までです（{len(image_paths)}枚指定）。")
+        paths: list[Path] = []
+        for raw in image_paths:
+            path = Path(raw)
+            if not path.is_file():
+                raise ValueError(f"画像ファイルが見つかりません: {path}")
+            if path.suffix.lower() not in _IMAGE_TYPES:
+                allowed = ", ".join(sorted(_IMAGE_TYPES))
+                raise ValueError(f"対応していない画像形式です: {path.name}（{allowed}）")
+            size = path.stat().st_size
+            if size > MAX_IMAGE_BYTES:
+                raise ValueError(
+                    f"画像が大きすぎます: {path.name}（{size:,}バイト・上限"
+                    f"{MAX_IMAGE_BYTES:,}バイト）。"
+                )
+            paths.append(path)
+        return paths
+
+    async def _upload_image(self, path: Path) -> str:
+        """画像を1枚アップロードして media_id を返す（内部メソッド）。"""
+        content_type = _IMAGE_TYPES.get(path.suffix.lower()) or (
+            mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        )
+        content = path.read_bytes()
+
+        last_error: Exception | None = None
+        for attempt in range(2):
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        f"{X_API_BASE}/media/upload",
+                        data={"media_category": "tweet_image", "media_type": content_type},
+                        files={"media": (path.name, content, content_type)},
+                        auth=self._auth,
+                    )
+
+                logger.info(
+                    "X media upload response: status=%d, body=%s",
+                    response.status_code,
+                    response.text,
+                )
+
+                if response.status_code >= 500 and attempt == 0:
+                    last_error = XPublishError(
+                        message="画像のアップロードでサーバーエラーが発生しました。",
+                        status_code=response.status_code,
+                    )
+                    continue
+
+                if response.status_code >= 400:
+                    raise XPublishError(
+                        message=f"画像のアップロードに失敗しました: {path.name}"
+                        f" (response: {response.text})",
+                        status_code=response.status_code,
+                    )
+
+                try:
+                    body = response.json()
+                except ValueError as e:
+                    raise XPublishError(
+                        message=f"画像アップロードの応答を解析できません: {e}"
+                    ) from e
+                data = body.get("data") if isinstance(body, dict) else None
+                media_id = data.get("id") if isinstance(data, dict) else None
+                if not media_id:
+                    raise XPublishError(
+                        message=f"画像アップロードの応答に media id がありません: {path.name}"
+                    )
+                return str(media_id)
+
+            except XPublishError:
+                raise
+            except httpx.HTTPError as e:
+                if attempt == 0:
+                    last_error = e
+                    continue
+                raise XPublishError(message=f"画像アップロードの通信エラー: {e}") from e
+
+        raise XPublishError(message=f"画像アップロードの通信エラー: {last_error}") from last_error
+
     async def publish(
         self,
         post: BlogPost,
         text: str | None = None,
+        image_paths: list[str | Path] | None = None,
         **kwargs: object,
     ) -> PublishResult:
         """記事の紹介ツイートを1件投稿する。
 
+        Args:
+            image_paths: 添付する画像（PNG/JPEG/WebP/GIF・4枚まで・各5MBまで）
+
         Raises:
             XPublishError: X API関連のエラー
-            ValueError: テキストのバリデーションエラー
+            ValueError: テキスト・画像のバリデーションエラー
         """
         if text is None:
             if post.wordpress_url:
@@ -247,7 +356,9 @@ class XPublisher:
                 text = post.title
 
         self.validate_text(text)
-        data = await self._post_tweet(text)
+        images = self.validate_images(image_paths) if image_paths else []
+        media_ids = [await self._upload_image(path) for path in images]
+        data = await self._post_tweet(text, media_ids=media_ids or None)
         tweet_data = data.get("data", {})
         if isinstance(tweet_data, dict):
             tweet_id = str(tweet_data.get("id", ""))
