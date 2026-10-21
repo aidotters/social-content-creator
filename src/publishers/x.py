@@ -199,6 +199,7 @@ class XPublisher:
                             "X Developer Portalでクレジットを"
                             "購入してください。"
                             " https://developer.x.com/"
+                            f" (response: {response.text})"
                         ),
                         status_code=402,
                     )
