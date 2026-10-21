@@ -10,7 +10,7 @@ description: 記事の紹介をX（Twitter）に投稿するスキル。docs/pos
 ## コマンド形式
 
 ```
-/publish-to-x [<article-path>] [--thread] [--image <path> ...]
+/publish-to-x [<article-path>] [--thread] [--image <path> ...] [--reply-to <tweet-id>]
 ```
 
 ## 引数
@@ -20,6 +20,7 @@ description: 記事の紹介をX（Twitter）に投稿するスキル。docs/pos
 | `<article-path>` | - | 記事ファイルのパス（docs/posts/ または docs/drafts/ 配下） |
 | `--thread` | - | スレッド形式で投稿する |
 | `--image <path>` | - | 添付する画像（PNG / JPEG / WebP / GIF・4枚まで・各5MBまで）。1ツイート投稿のときだけ使える |
+| `--reply-to <tweet-id>` | - | そのツイートへの返信として投稿する（1ツイート投稿のときだけ）。本文を投稿した後に、画像つきの返信を続けるときに使う。ID は投稿 URL の末尾の数字 |
 
 ## 実行フロー
 
@@ -157,6 +158,7 @@ result = asyncio.run(pub.publish(
     post,
     text='''${TWEET_TEXT}''',
     image_paths=[${IMAGE_PATHS}],  # 例: ['/Users/tak/Downloads/chart.png']
+    reply_to=${REPLY_TO},  # 返信にするときだけ。例: '2112768542827499829'。無ければ省く
 ))
 
 # スレッド投稿の場合

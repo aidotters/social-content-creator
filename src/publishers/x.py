@@ -338,12 +338,15 @@ class XPublisher:
         post: BlogPost,
         text: str | None = None,
         image_paths: list[str | Path] | None = None,
+        reply_to: str | None = None,
         **kwargs: object,
     ) -> PublishResult:
         """記事の紹介ツイートを1件投稿する。
 
         Args:
             image_paths: 添付する画像（PNG/JPEG/WebP/GIF・4枚まで・各5MBまで）
+            reply_to: 返信先のツイート ID。指定すると、そのツイートへの返信として投稿する
+                （本文のあとに画像つきの返信を続ける用途）
 
         Raises:
             XPublishError: X API関連のエラー
@@ -358,7 +361,7 @@ class XPublisher:
         self.validate_text(text)
         images = self.validate_images(image_paths) if image_paths else []
         media_ids = [await self._upload_image(path) for path in images]
-        data = await self._post_tweet(text, media_ids=media_ids or None)
+        data = await self._post_tweet(text, reply_to=reply_to, media_ids=media_ids or None)
         tweet_data = data.get("data", {})
         if isinstance(tweet_data, dict):
             tweet_id = str(tweet_data.get("id", ""))

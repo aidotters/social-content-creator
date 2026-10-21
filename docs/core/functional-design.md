@@ -406,9 +406,16 @@ class XPublisher:
         self,
         post: BlogPost,
         text: str | None = None,
+        image_paths: list[str | Path] | None = None,
+        reply_to: str | None = None,
         **kwargs: object,
     ) -> PublishResult:
-        """記事の紹介ツイートを1件投稿する"""
+        """記事の紹介ツイートを1件投稿する。
+
+        image_paths: 添付する画像（4枚まで・各5MBまで）。先に v2 の media/upload で上げ、
+            1枚でも失敗したらツイートしない。
+        reply_to: 返信先のツイート ID（本文のあとに画像つきの返信を続ける用途）。
+        """
         ...
 
     async def publish_thread(

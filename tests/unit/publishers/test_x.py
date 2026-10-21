@@ -438,6 +438,28 @@ class TestPublishWithImages:
         assert json.loads(tweet.calls[0].request.content) == {"text": "文字だけ"}
 
     @respx.mock
+    async def test_reply_with_image(
+        self, publisher: XPublisher, blog_post: BlogPost, tmp_path: Path
+    ) -> None:
+        """reply_to を渡すと、画像つきの返信として投稿する。"""
+        respx.post(f"{X_API_BASE}/media/upload").mock(
+            return_value=httpx.Response(200, json={"data": {"id": "m1"}})
+        )
+        tweet = respx.post(f"{X_API_BASE}/tweets").mock(return_value=_tweet_response("556"))
+
+        result = await publisher.publish(
+            blog_post, text="会話の画像", image_paths=[_png(tmp_path)], reply_to="555"
+        )
+
+        assert result.url == "https://x.com/i/status/556"
+        body = json.loads(tweet.calls[0].request.content)
+        assert body == {
+            "text": "会話の画像",
+            "reply": {"in_reply_to_tweet_id": "555"},
+            "media": {"media_ids": ["m1"]},
+        }
+
+    @respx.mock
     async def test_upload_failure_does_not_tweet(
         self, publisher: XPublisher, blog_post: BlogPost, tmp_path: Path
     ) -> None:
