@@ -490,9 +490,7 @@ class TestPublishWithImages:
         assert await publisher._upload_image(_png(tmp_path)) == "m2"
 
     @respx.mock
-    async def test_upload_response_without_id(
-        self, publisher: XPublisher, tmp_path: Path
-    ) -> None:
+    async def test_upload_response_without_id(self, publisher: XPublisher, tmp_path: Path) -> None:
         """応答に id が無ければ失敗にする。"""
         respx.post(f"{X_API_BASE}/media/upload").mock(
             return_value=httpx.Response(200, json={"data": {}})
@@ -526,7 +524,10 @@ class TestValidateImages:
             XPublisher.validate_images([path])
 
     async def test_invalid_image_blocks_before_upload(
-        self, publisher: XPublisher, blog_post: BlogPost, mocker: pytest_mock.MockerFixture,
+        self,
+        publisher: XPublisher,
+        blog_post: BlogPost,
+        mocker: pytest_mock.MockerFixture,
         tmp_path: Path,
     ) -> None:
         """2枚目が不正なら1枚目もアップロードしない。"""
@@ -534,7 +535,5 @@ class TestValidateImages:
         bad = tmp_path / "x.bmp"
         bad.write_bytes(b"BM")
         with pytest.raises(ValueError):
-            await publisher.publish(
-                blog_post, text="図", image_paths=[_png(tmp_path), bad]
-            )
+            await publisher.publish(blog_post, text="図", image_paths=[_png(tmp_path), bad])
         upload.assert_not_called()
